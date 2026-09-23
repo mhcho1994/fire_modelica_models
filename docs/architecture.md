@@ -65,10 +65,16 @@ FastDyn 값 adapter의 IMU/magnetometer 출력은 sensor mount 회전을 되돌�
 
 `Systems.Actuation`은 servo 등 actuator 조립을 담당하고, motor·blade 조립은 `Systems.Propulsion`에 둔다. PWM 수치 정규화는 `Adapters`의 책임이다. `PwmCommandAdapter`라는 이름 변경은 PWM edge decoding이나 ESC 물리를 추가한 것이 아니다. 현재 `RotaryServo`의 내부 응답 교체·상세 전기 driver는 후속 확장이고, 이번 변경에서는 기존 각도 제한과 1차 응답을 보존했다.
 
+## Record의 소유 영역
+
+최상위 `Data` package는 두지 않는다. 질량·CG·관성을 표현하는 `Physical.Mechanical.MassProperties`는 vehicle 종류와 무관한 공통 물리 record다. 기존 `Data.AirframeGeometry`는 `Vehicles.Copter.Geometry`로 이동·개명했고, 네 geometry preset은 `Vehicles.Copter.Presets`에 둔다. 이전 경로의 별칭은 남기지 않는다.
+
+Copter 조립체가 geometry를 해석해 하위 물리 부품과 센서에 필요한 parameter를 전달한다. 공통 `Physical`·`Systems` 계층이 copter geometry에 의존하지 않도록 유지한다. 현재 `Geometry`에는 actuator mapping과 센서 mount도 포함하며, 이 필드들의 분리는 후속 구성 확장에서 다룬다. Rover·FixedWing·향후 Submarine의 전용 배치는 각 vehicle 영역이 소유한다.
+
 ## 구성과 재현
 
 `tools/generate_config.py`는 TOML을 검증하고 기존 Modelica class의 numeric modifier를 생성한다. 운동방정식은 생성하지 않는다. Geometry·part class·채널 수 변경은 재컴파일 대상이다. Manifest는 생성 시점의 Modelica source digest와 compiler version을 담는다. 수치 parameter의 runtime 수정 가능 여부는 내보낸 FMU metadata에서 별도로 확인해야 한다.
 
-출력 디렉터리는 저장소의 `build/` 내부 또는 저장소 외부만 허용한다. 기존 Modelica 소스와 생성기 소유 표시가 없는 파일은 덮어쓰지 않는다. 공통 arm record의 CG는 armMount의 절반에 두며, 실제 부품 형상에서 질량·관성을 추정하는 기능은 없다. 구성 도구보다 일반적인 geometry는 `Data.AirframeGeometry`를 직접 지정할 수 있다.
+출력 디렉터리는 저장소의 `build/` 내부 또는 저장소 외부만 허용한다. 기존 Modelica 소스와 생성기 소유 표시가 없는 파일은 덮어쓰지 않는다. 공통 arm record의 CG는 armMount의 절반에 두며, 실제 부품 형상에서 질량·관성을 추정하는 기능은 없다. 구성 도구보다 일반적인 geometry는 `Vehicles.Copter.Geometry`를 직접 지정할 수 있다. Preset은 선택적 기본값이며 Rumoca 컴파일의 전제 조건이 아니다. 현재 생성기는 `QuadX`, `HexaX`, `OctoX`, `CoaxialX8`에서 arm·rotor 수를 결정한다. Preset 없이 개수·배치 규칙 또는 rotor별 위치·자세를 지정하는 TOML schema는 아직 구현하지 않았다.
 
 `tools/verify.py`는 native 물리 assertions와 조립·legacy 경로를 실행한다. `tools/probe_export.py`는 별도의 FMU build/load/실행 검증이다. Native 성공, FMU 생성 성공, 실제 FMU 실행 성공, FastDyn 통합 성공을 서로 구분한다.

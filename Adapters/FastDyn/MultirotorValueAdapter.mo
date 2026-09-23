@@ -1,6 +1,6 @@
 within FIRE_Modelica.Adapters.FastDyn;
 model MultirotorValueAdapter "Flat value boundary for host integration; not a firmware driver"
-  parameter Data.AirframeGeometry geometry;
+  parameter Vehicles.Copter.Geometry geometry;
   parameter Real actuatorSamplePeriod=0.0025;
   parameter Real p_start[3]={0,0,1};
   input Real pwm_us[geometry.nActuators];

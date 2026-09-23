@@ -1,6 +1,6 @@
 within FIRE_Modelica.Examples;
 model QuadHover "Open-loop force balance with initialized rotor speed; no flight controller"
-  parameter Data.AirframeGeometry geometry=Data.Presets.QuadX();
+  parameter Vehicles.Copter.Geometry geometry=Vehicles.Copter.Presets.QuadX();
   Vehicles.Copter.MultirotorWithSensors vehicle(geometry=geometry,
     rotorSpeed_start={sqrt(vehicle.chassis.mass*9.80665/(geometry.nRotors*vehicle.kT[i])) for i in 1:geometry.nRotors});
 equation

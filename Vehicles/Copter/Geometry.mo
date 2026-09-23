@@ -1,5 +1,5 @@
-within FIRE_Modelica.Data;
-record AirframeGeometry "Fixed mounts resolved in chassis reference C; SI units"
+within FIRE_Modelica.Vehicles.Copter;
+record Geometry "Fixed mounts resolved in chassis reference C; SI units"
   parameter Integer nArms(min=1) = 4;
   parameter Integer nRotors(min=1) = nArms;
   parameter Integer nLegs(min=0) = 4;
@@ -18,4 +18,4 @@ record AirframeGeometry "Fixed mounts resolved in chassis reference C; SI units"
   parameter Real barometerPosition_C[3] = zeros(3);
   parameter Real R_bImu[3,3] = identity(3);
   parameter Real R_bMag[3,3] = identity(3);
-end AirframeGeometry;
+end Geometry;

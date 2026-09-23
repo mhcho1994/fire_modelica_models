@@ -38,10 +38,10 @@ Python 3.11 이상은 표준 `tomllib`을 사용합니다. Python 3.10에서는 
 ```text
 Interfaces/                       truth, measurement, legacy bus 계약
 Utilities/Math/                   quaternion·회전·기하 함수
-Data/                             질량 record, geometry, Quad/Hex/Octo/X8 preset
 Physical/Mechanical/
+  MassProperties.mo               vehicle 종류와 무관한 질량·CG·관성 record
   Dynamics/                       공통 quaternion 6DOF
-  Chassis/{Core,Arms,Payloads}/    강체 부품의 질량·CG·관성
+  Chassis/{CenterBody,Arms,Payloads}/  강체 부품의 질량·CG·관성
   Chassis/LandingGear/            massless compliant point leg 조립
   Contact/                        unilateral spring/damper와 마찰
   Aerodynamics/{Blades,...}/      blade 공력과 body drag
@@ -53,11 +53,15 @@ Systems/Sensing/
   SensorSuite.mo                   기본 네 센서의 선택적 조립
 Worlds/{Environment,Terrain}/
 Vehicles/{Copter,FixedWing,Rover}/
+  Copter/Geometry.mo               multirotor 배치와 장착 설정
+  Copter/Presets/                  선택적 Quad/Hex/Octo/X8 geometry 기본값
 Adapters/{Legacy,FastDyn}/
 Examples/  Tests/  configs/  tools/  docs/  upstream/
 ```
 
 `Physical.Electrical`, Logical device/register/FIFO·driver·scheduler, EMI/vulnerability, dynamic blade flapping은 후속 구현입니다. 초기 비행 모델에는 이를 위한 빈 package나 가짜 동작을 추가하지 않았습니다. `Logical.Communications`의 Link는 여전히 interface이며 완성된 protocol/channel이 아닙니다.
+
+최상위 `Data` package는 제거했습니다. 공통 질량 record는 `Physical.Mechanical.MassProperties`, copter 전용 배치는 `Vehicles.Copter.Geometry`, 기본 배치는 `Vehicles.Copter.Presets`를 사용합니다. Preset은 필수가 아니며 Modelica에서 `Geometry`를 직접 구성할 수 있습니다. 현재 TOML 생성기는 네 가지 preset으로 arm·rotor 수를 결정하므로, preset 없는 임의 N-rotor TOML 지원은 후속 확장입니다.
 
 ## 조립과 물리 계약
 

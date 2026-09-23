@@ -32,7 +32,7 @@ package ChassisRejectedConfigurations "Negative fixtures: each nested model must
   model MasslessInertia "Expected error: A zero-mass part cannot carry nonzero mass inertia"
     FIRE_Modelica.Physical.Mechanical.Chassis.ChassisAssembly chassis(
       useAssembledMass = true, nAdditionalParts = 1,
-      additionalParts = {FIRE_Modelica.Data.MassProperties(mass = 0, inertia = identity(3))});
+      additionalParts = {FIRE_Modelica.Physical.Mechanical.MassProperties(mass = 0, inertia = identity(3))});
     output Real totalMass = chassis.mass;
   end MasslessInertia;
 end ChassisRejectedConfigurations;

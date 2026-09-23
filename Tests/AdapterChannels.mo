@@ -1,6 +1,6 @@
 within FIRE_Modelica.Tests;
 model AdapterChannels "Eight independent PWM channels, clipping and value frame conversions"
-  Adapters.FastDyn.MultirotorValueAdapter adapter(geometry=Data.Presets.OctoX(
+  Adapters.FastDyn.MultirotorValueAdapter adapter(geometry=Vehicles.Copter.Presets.OctoX(
       R_bImu=[0,-1,0;1,0,0;0,0,1],R_bMag=diagonal({1,-1,-1})),
     vehicle(gravity_w=zeros(3),p_start={1,2,10}));
   Adapters.Legacy.SensorBusAdapter legacy(R_bImu=adapter.geometry.R_bImu,R_bMag=adapter.geometry.R_bMag);

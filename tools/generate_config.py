@@ -255,16 +255,16 @@ def render(config):
     # The empty matrix literal {} is rank one; leave the record's [0,3] default in place.
     if g["nLegs"] == 0:
         del g["legPosition_C"]
-    modifiers = ["geometry=" + record("FIRE_Modelica.Data.AirframeGeometry", g)]
+    modifiers = ["geometry=" + record("FIRE_Modelica.Vehicles.Copter.Geometry", g)]
     m = config["mass"]
     modifiers.append("useAssembledMass=" + literal(m["mode"] == "assembled"))
     if m["mode"] == "aggregate":
-        modifiers.append("aggregate=" + record("FIRE_Modelica.Data.MassProperties", m["aggregate"]))
+        modifiers.append("aggregate=" + record("FIRE_Modelica.Physical.Mechanical.MassProperties", m["aggregate"]))
     else:
-        modifiers.append("core=" + record("FIRE_Modelica.Physical.Mechanical.Chassis.Core.RigidCore", m["core"]))
+        modifiers.append("core=" + record("FIRE_Modelica.Physical.Mechanical.Chassis.CenterBody.RigidCenterBody", m["core"]))
         for key, field, kind in (("arms", "arms", "FIRE_Modelica.Physical.Mechanical.Chassis.Arms.RigidArm"),
                 ("payloads", "payloads", "FIRE_Modelica.Physical.Mechanical.Chassis.Payloads.FixedPayload"),
-                ("additional_parts", "additionalParts", "FIRE_Modelica.Data.MassProperties")):
+                ("additional_parts", "additionalParts", "FIRE_Modelica.Physical.Mechanical.MassProperties")):
             if key != "arms":
                 modifiers.append(("nPayloads" if key == "payloads" else "nAdditionalParts") + "=" + str(len(m[key])))
             if m[key]:

@@ -1,7 +1,7 @@
 within FIRE_Modelica.Adapters.FastDyn;
 
 model MultirotorFmu "Flat FMI boundary with sampled measurements and separate continuous truth"
-  parameter FIRE_Modelica.Data.AirframeGeometry geometry;
+  parameter FIRE_Modelica.Vehicles.Copter.Geometry geometry;
   parameter Real p_start[3]={0,0,1};
   parameter Real actuatorSamplePeriod=0.0025;
   input Real pwm_us[geometry.nActuators];

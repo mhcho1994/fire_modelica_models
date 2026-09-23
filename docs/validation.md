@@ -42,3 +42,14 @@ FMU build·load·실행은 [별도 기록](export_validation.md)을 따른다. N
 Rumoca 소스와 Cargo.lock은 변경하지 않았다. 새 라이브러리의 Rumoca compile/FMU 성공을 주장하지 않으며, 이 경로의 `sample/when`, 접촉 event, export runtime 검증은 남아 있다.
 
 FastDyn backend와 실제 firmware driver 실행도 이번 검증 범위가 아니다. 추가한 adapter는 channel·frame·단위·시간 계약을 명시한 값 경계이며, 실제 host revision의 IO와 연결하는 통합 검증이 별도로 필요하다.
+
+## 2026-09-23 Record 패키지 재배치 검증
+
+`Data`를 제거하고 `MassProperties`를 `Physical.Mechanical`, `AirframeGeometry`를 `Vehicles.Copter.Geometry`, preset을 `Vehicles.Copter.Presets`로 이동한 뒤 다음 검증을 다시 실행했다.
+
+- Native 시뮬레이션 27개, 잘못된 질량 구성 거부 5개, 기존 namespace 검사 2개 통과.
+- `FIRE_TEST_OMC=1`로 구성 생성기 시험 19개 통과. TOML 예제와 네 preset의 zero-leg 구성이 새 namespace에서 `checkModel`을 통과했다.
+- OpenModelica FMI 2.0 Co-Simulation FMU를 새로 빌드하고 8채널 입력, 센서 sampling/hold, 착지·이륙 실행 검사 통과.
+- 이동한 record와 preset의 필드·기본값이 namespace/class 이름 변경을 제외하고 동일하며, 변경한 package의 `package.order`가 실제 파일과 일치함을 확인했다.
+
+기존 Quad/Hex/payload 생성 파일과 manifest도 새 namespace로 갱신했다. 물리식과 TOML schema는 변경하지 않았으며 Rumoca 및 FastDyn host 실행 검증은 포함하지 않는다.

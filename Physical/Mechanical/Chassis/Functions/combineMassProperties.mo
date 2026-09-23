@@ -1,8 +1,8 @@
 within FIRE_Modelica.Physical.Mechanical.Chassis.Functions;
 
 function combineMassProperties "Rotate and translate each part's full inertia tensor"
-  input FIRE_Modelica.Data.MassProperties parts[:];
-  output FIRE_Modelica.Data.MassProperties combined;
+  input FIRE_Modelica.Physical.Mechanical.MassProperties parts[:];
+  output FIRE_Modelica.Physical.Mechanical.MassProperties combined;
 protected
   Real offset[3];
   Real rotatedInertia[3, 3];

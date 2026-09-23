@@ -1,4 +1,4 @@
-within FIRE_Modelica.Data;
+within FIRE_Modelica.Vehicles.Copter;
 package Presets "Example geometry only; coefficients are illustrative, not calibrated vehicles"
   extends Modelica.Icons.Package;
 end Presets;

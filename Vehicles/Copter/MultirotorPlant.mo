@@ -1,15 +1,15 @@
 within FIRE_Modelica.Vehicles.Copter;
 model MultirotorPlant "N-rotor rigid vehicle, ENU world / FLU at combined CG"
-  parameter Data.AirframeGeometry geometry;
+  parameter Vehicles.Copter.Geometry geometry;
   parameter Boolean useAssembledMass = false;
-  parameter Data.MassProperties aggregate(mass=1.5,inertia=diagonal({0.02,0.02,0.04}));
-  parameter Physical.Mechanical.Chassis.Core.RigidCore core(mass=1.2,inertia=diagonal({0.015,0.015,0.025}));
+  parameter Physical.Mechanical.MassProperties aggregate(mass=1.5,inertia=diagonal({0.02,0.02,0.04}));
+  parameter Physical.Mechanical.Chassis.CenterBody.RigidCenterBody core(mass=1.2,inertia=diagonal({0.015,0.015,0.025}));
   parameter Physical.Mechanical.Chassis.Arms.RigidArm arms[geometry.nArms](
     each mass=0.05,r_C=geometry.armMount/2,each inertia=diagonal({0.0001,0.0001,0.0002}));
   parameter Integer nPayloads(min=0) = 0;
   parameter Physical.Mechanical.Chassis.Payloads.FixedPayload payloads[nPayloads];
   parameter Integer nAdditionalParts(min=0) = 0;
-  parameter Data.MassProperties additionalParts[nAdditionalParts];
+  parameter Physical.Mechanical.MassProperties additionalParts[nAdditionalParts];
   parameter Real omegaMax[geometry.nRotors] = fill(1000,geometry.nRotors) "rad/s";
   parameter Real motorTau[geometry.nRotors] = fill(0.03,geometry.nRotors) "s";
   parameter Real kT[geometry.nRotors] = fill(1e-5,geometry.nRotors) "N/(rad/s)^2";
