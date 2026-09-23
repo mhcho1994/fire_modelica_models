@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 
 model QuadImuResponse "Direct IMU assembly with first-order acceleration and gyro responses"
   extends QuadImuOnly(

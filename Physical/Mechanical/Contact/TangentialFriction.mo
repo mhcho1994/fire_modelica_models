@@ -1,4 +1,4 @@
-within FIRE_Modelica.Physical.Mechanical.Contact;
+within fire_modelica_models.Physical.Mechanical.Contact;
 
 model TangentialFriction "Dissipative viscous friction limited by the normal load"
   parameter Real tangentialDamping(min = 0, unit = "N.s/m") = 25;

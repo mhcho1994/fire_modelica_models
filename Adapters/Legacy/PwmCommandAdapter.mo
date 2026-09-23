@@ -1,7 +1,7 @@
-within FIRE_Modelica.Adapters.Legacy;
+within fire_modelica_models.Adapters.Legacy;
 
 model PwmCommandAdapter "Sample and normalize numeric PWM commands; no actuator dynamics"
-  import FIRE_Modelica.Utilities.Math.clip;
+  import fire_modelica_models.Utilities.Math.clip;
 
   parameter Integer nChannels(min = 1) = 4
     "Number of PWM actuator channels";
@@ -28,7 +28,7 @@ algorithm
   when sample(0, samplePeriod) then
     for i in 1:nChannels loop
       normalizedBuffer[i] := clip(
-        (pwmCommand[i] - pwmTrim[i]) / max(pwmMax[i] - pwmTrim[i], FIRE_Modelica.Utilities.Constants.eps),
+        (pwmCommand[i] - pwmTrim[i]) / max(pwmMax[i] - pwmTrim[i], fire_modelica_models.Utilities.Constants.eps),
         -1,
         1);
     end for;

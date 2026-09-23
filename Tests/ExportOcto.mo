@@ -1,8 +1,8 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model ExportOcto "FMU boundary fixture with eight independent PWM inputs and observable contact"
-  extends FIRE_Modelica.Adapters.FastDyn.MultirotorFmu(
-    geometry=FIRE_Modelica.Vehicles.Copter.Presets.OctoX(), p_start={0,0,0.5});
+  extends fire_modelica_models.Adapters.FastDyn.MultirotorFmu(
+    geometry=fire_modelica_models.Vehicles.Copter.Presets.OctoX(), p_start={0,0,0.5});
   output Boolean contact[geometry.nLegs];
   output Real gap[geometry.nLegs];
   output Real normalForce[geometry.nLegs];

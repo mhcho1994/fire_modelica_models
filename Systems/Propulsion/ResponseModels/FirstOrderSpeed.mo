@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Propulsion.ResponseModels;
+within fire_modelica_models.Systems.Propulsion.ResponseModels;
 model FirstOrderSpeed "Load-independent first-order rotor speed response"
   parameter Modelica.Units.SI.Time tau = 0.02;
   parameter Modelica.Units.SI.AngularVelocity omegaMax = 1000;

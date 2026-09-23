@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = "FIRE_Modelica.Tests.ExportOcto"
+MODEL = "fire_modelica_models.Tests.ExportOcto"
 PERIODS = (0.0025, 0.02, 0.2, 0.02)
 GROUPS = (
     [f"{name}[{i}]" for name in ("acceleration_frd", "gyro_frd") for i in range(1, 4)],

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing;
+within fire_modelica_models.Systems.Sensing;
 
 package IMU
 end IMU;

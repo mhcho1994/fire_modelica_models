@@ -1,4 +1,4 @@
-within FIRE_Modelica.Utilities.Math;
+within fire_modelica_models.Utilities.Math;
 
 function rotateVectorByQuaternion
   input Real v[3] "Vector in the source frame";

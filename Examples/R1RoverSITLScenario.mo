@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 
 model R1RoverSITLScenario
   Worlds.World world;

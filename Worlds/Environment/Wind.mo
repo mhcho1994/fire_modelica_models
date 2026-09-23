@@ -1,4 +1,4 @@
-within FIRE_Modelica.Worlds.Environment;
+within fire_modelica_models.Worlds.Environment;
 
 model Wind
   parameter Real wind0[3] = {0, 0, 0} "Constant wind in world frame [m/s]";

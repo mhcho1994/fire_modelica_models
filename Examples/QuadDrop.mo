@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 model QuadDrop "Drop onto four independent compliant legs with sampled sensors"
   Vehicles.Copter.MultirotorWithSensors vehicle(p_start={0,0,0.5});
 equation

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications;
+within fire_modelica_models.Logical.Communications;
 
 package SPI
 end SPI;

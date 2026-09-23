@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.PWM;
+within fire_modelica_models.Logical.Communications.PWM;
 
 record PwmConfig
   parameter Real frequency(min = 0) = 50 "PWM signal frequency [Hz]";

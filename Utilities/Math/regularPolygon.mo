@@ -1,4 +1,4 @@
-within FIRE_Modelica.Utilities.Math;
+within fire_modelica_models.Utilities.Math;
 function regularPolygon "Positions about +z, first point at phase (radians)"
   input Integer n;
   input Real radius;

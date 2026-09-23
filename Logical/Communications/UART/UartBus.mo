@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.UART;
+within fire_modelica_models.Logical.Communications.UART;
 
 expandable connector UartBus
   Boolean tx "Transmit line";

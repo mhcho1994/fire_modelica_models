@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.PWM;
+within fire_modelica_models.Logical.Communications.PWM;
 
 partial model PwmLink
   parameter PwmConfig config "PWM configuration";

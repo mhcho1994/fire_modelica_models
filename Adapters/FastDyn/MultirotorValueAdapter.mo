@@ -1,4 +1,4 @@
-within FIRE_Modelica.Adapters.FastDyn;
+within fire_modelica_models.Adapters.FastDyn;
 model MultirotorValueAdapter "Flat value boundary for host integration; not a firmware driver"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Real actuatorSamplePeriod=0.0025;

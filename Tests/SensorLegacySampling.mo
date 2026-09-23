@@ -1,21 +1,21 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model SensorLegacySampling "Compare all four legacy pre-buffer sensors with settled sampled outputs"
   parameter Real pressureSlope(unit="Pa/s") = 1;
   parameter Real temperatureSlope(unit="K/s") = 1;
-  FIRE_Modelica.Systems.Sensing.SensorSuite suite(
+  fire_modelica_models.Systems.Sensing.SensorSuite suite(
     imuSamplePeriod=0.01, magnetometerSamplePeriod=0.02,
     gnssSamplePeriod=0.1, barometerSamplePeriod=0.05,
     accelBias={0.1,0.2,0.3}, gyroBias={0.01,0.02,0.03},
     magBias={1e-6,2e-6,3e-6}, positionBias={1,2,3},
     velocityBias={0.1,0.2,0.3}, pressureBias=10, altitudeBias=2);
-  FIRE_Modelica.Systems.Sensing.IMU.LowFidelity imu(
+  fire_modelica_models.Systems.Sensing.IMU.LowFidelity imu(
     samplePeriod=0.01, accelBias={0.1,0.2,0.3}, gyroBias={0.01,0.02,0.03});
-  FIRE_Modelica.Systems.Sensing.Magnetometer.LowFidelity magnetometer(
+  fire_modelica_models.Systems.Sensing.Magnetometer.LowFidelity magnetometer(
     samplePeriod=0.02, magBias={1e-6,2e-6,3e-6});
-  FIRE_Modelica.Systems.Sensing.GNSS.LowFidelity gnss(
+  fire_modelica_models.Systems.Sensing.GNSS.LowFidelity gnss(
     samplePeriod=0.1, positionBias={1,2,3}, velocityBias={0.1,0.2,0.3});
-  FIRE_Modelica.Systems.Sensing.Barometer.LowFidelity barometer(
+  fire_modelica_models.Systems.Sensing.Barometer.LowFidelity barometer(
     samplePeriod=0.05, pressureBias=10, altitudeBias=2);
   Modelica.Blocks.Sources.RealExpression magneticSource[3](y=suite.magneticField_w);
   Modelica.Blocks.Sources.RealExpression pressureSource(y=suite.pressure);

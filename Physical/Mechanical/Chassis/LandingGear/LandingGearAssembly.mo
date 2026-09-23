@@ -1,4 +1,4 @@
-within FIRE_Modelica.Physical.Mechanical.Chassis.LandingGear;
+within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
 
 model LandingGearAssembly "Independent contacts on an arbitrary number of legs"
   parameter Integer nLegs(min = 0) = 4;

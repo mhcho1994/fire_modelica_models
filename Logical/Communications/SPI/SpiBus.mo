@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.SPI;
+within fire_modelica_models.Logical.Communications.SPI;
 
 expandable connector SpiBus
   Boolean sclk "Serial clock";

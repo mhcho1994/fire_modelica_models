@@ -1,9 +1,9 @@
-within FIRE_Modelica.Systems.Propulsion;
+within fire_modelica_models.Systems.Propulsion;
 model SpeedDrivenRotor "Empirical speed lag plus static blade aerodynamics"
   extends PartialSpeedDrivenRotor;
   ResponseModels.FirstOrderSpeed response(
     tau = tau, omegaMax = omegaMax, omega_start = omega_start);
-  FIRE_Modelica.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade blade(
+  fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade blade(
     kT = kT, kQ = kQ, spinSign = spinSign);
 equation
   response.demand = demand;

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.Barometer;
+within fire_modelica_models.Systems.Sensing.Barometer;
 
 model LowFidelity
   parameter Real samplePeriod = 0.02 "Barometer sample period [s]";

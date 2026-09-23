@@ -1,7 +1,7 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model ContactZeroLegs "A vehicle may omit landing contacts independently of rotor count"
-  FIRE_Modelica.Physical.Mechanical.Chassis.LandingGear.LandingGearAssembly gear(nLegs = 0);
+  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.LandingGearAssembly gear(nLegs = 0);
 equation
   gear.p_w = zeros(3);
   gear.v_b = zeros(3);

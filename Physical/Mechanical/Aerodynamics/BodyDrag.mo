@@ -1,4 +1,4 @@
-within FIRE_Modelica.Physical.Mechanical.Aerodynamics;
+within fire_modelica_models.Physical.Mechanical.Aerodynamics;
 model BodyDrag "Dissipative diagonal body drag applied at the CG"
   parameter Real linearDrag[3](each unit = "N.s/m") = zeros(3);
   parameter Modelica.Units.SI.Area dragArea[3] = zeros(3);

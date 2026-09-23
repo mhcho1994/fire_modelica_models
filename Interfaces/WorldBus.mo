@@ -1,4 +1,4 @@
-within FIRE_Modelica.Interfaces;
+within fire_modelica_models.Interfaces;
 
 expandable connector WorldBus
   Real gravity[3] "Gravity vector in world frame [m/s2]";

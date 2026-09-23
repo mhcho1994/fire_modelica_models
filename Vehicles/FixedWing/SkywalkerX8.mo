@@ -1,4 +1,4 @@
-within FIRE_Modelica.Vehicles.FixedWing;
+within fire_modelica_models.Vehicles.FixedWing;
 
 model SkywalkerX8
   extends FixedWingBase;
@@ -8,7 +8,7 @@ model SkywalkerX8
   parameter Real barometerSamplePeriod = 0.02;
   parameter Real gnssSamplePeriod = 0.2;
   parameter Real magnetometerSamplePeriod = 0.02;
-  parameter Real imuMountRoll = 180 * FIRE_Modelica.Utilities.Constants.d2r
+  parameter Real imuMountRoll = 180 * fire_modelica_models.Utilities.Constants.d2r
     "IMU roll mounting angle from SITL SDF [rad]";
   parameter Real imuMountPitch = 0 "IMU pitch mounting angle [rad]";
   parameter Real imuMountYaw = 0 "IMU yaw mounting angle [rad]";

@@ -1,10 +1,10 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model ContactSettlingTakeoff "Drop onto a compliant leg, settle, and lift off without state resets"
   parameter Real mass = 2;
   parameter Real g = 9.81;
   parameter Real stiffness = 1000;
-  FIRE_Modelica.Physical.Mechanical.Chassis.LandingGear.LandingGearAssembly gear(
+  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.LandingGearAssembly gear(
     nLegs = 1, rLeg_b = {{0, 0, 0}}, stiffness = stiffness, damping = 60);
   Real z(start = 0.2, fixed = true);
   Real v(start = 0, fixed = true);

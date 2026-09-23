@@ -1,7 +1,7 @@
-within FIRE_Modelica.Vehicles.FixedWing;
+within fire_modelica_models.Vehicles.FixedWing;
 
 model FixedWingCommandMapper
-  import FIRE_Modelica.Utilities.Math.clip;
+  import fire_modelica_models.Utilities.Math.clip;
 
   parameter Integer nChannels(min = 3) = 3
     "Number of normalized actuator channels";

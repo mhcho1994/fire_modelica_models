@@ -1,4 +1,4 @@
-within FIRE_Modelica.Interfaces;
+within fire_modelica_models.Interfaces;
 
 record VehicleTruth "Continuous rigid-body truth; never a sensor measurement"
   Real p_w[3](each unit="m") "CG position in ENU world";

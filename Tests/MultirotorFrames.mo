@@ -1,4 +1,4 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model MultirotorFrames "Nontrivial channel map, tilted rotor, shifted CG, hub torque exactly once"
   Vehicles.Copter.MultirotorPlant vehicle(
     geometry(nArms=1,nRotors=2,nLegs=0,nActuators=3,

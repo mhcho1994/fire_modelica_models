@@ -1,11 +1,11 @@
-within FIRE_Modelica.Adapters.FastDyn;
+within fire_modelica_models.Adapters.FastDyn;
 
 model MultirotorFmu "Flat FMI boundary with sampled measurements and separate continuous truth"
-  parameter FIRE_Modelica.Vehicles.Copter.Geometry geometry;
+  parameter fire_modelica_models.Vehicles.Copter.Geometry geometry;
   parameter Real p_start[3]={0,0,1};
   parameter Real actuatorSamplePeriod=0.0025;
   input Real pwm_us[geometry.nActuators];
-  FIRE_Modelica.Adapters.FastDyn.MultirotorValueAdapter adapter(
+  fire_modelica_models.Adapters.FastDyn.MultirotorValueAdapter adapter(
     geometry=geometry, p_start=p_start, actuatorSamplePeriod=actuatorSamplePeriod);
   output Real acceleration_frd[3] "Specific force [m/s2]";
   output Real gyro_frd[3] "rad/s";

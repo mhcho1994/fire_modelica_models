@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.ResponseModels;
+within fire_modelica_models.Systems.Sensing.ResponseModels;
 
 model FirstOrder "Independent first-order channels; tau=0 bypasses a channel"
   extends PartialResponse;

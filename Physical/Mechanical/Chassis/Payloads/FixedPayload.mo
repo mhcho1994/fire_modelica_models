@@ -1,5 +1,5 @@
-within FIRE_Modelica.Physical.Mechanical.Chassis.Payloads;
+within fire_modelica_models.Physical.Mechanical.Chassis.Payloads;
 
 record FixedPayload "Fixed payload included once in the vehicle mass budget"
-  extends FIRE_Modelica.Physical.Mechanical.MassProperties;
+  extends fire_modelica_models.Physical.Mechanical.MassProperties;
 end FixedPayload;

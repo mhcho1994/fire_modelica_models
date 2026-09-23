@@ -1,7 +1,7 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model DynamicsQuaternion "Hamilton body-rate composition and velocity transport"
   constant Real s = sqrt(0.5);
-  FIRE_Modelica.Physical.Mechanical.Dynamics.RigidBody6DOF body(
+  fire_modelica_models.Physical.Mechanical.Dynamics.RigidBody6DOF body(
     q_start = {s, s, 0, 0}, omega_start = {0, 0, 2}, v_start = {1, 0, 0});
   Real expectedQuaternion[4];
 initial equation

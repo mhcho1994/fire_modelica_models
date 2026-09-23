@@ -1,4 +1,4 @@
-within FIRE_Modelica.Vehicles.Common;
+within fire_modelica_models.Vehicles.Common;
 
 partial model Vehicle6DOF
   output Real position[3] "World position [m]";

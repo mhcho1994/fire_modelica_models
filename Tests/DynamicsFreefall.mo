@@ -1,6 +1,6 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model DynamicsFreefall "Ballistic trajectory and zero CG specific force"
-  FIRE_Modelica.Physical.Mechanical.Dynamics.RigidBody6DOF body(
+  fire_modelica_models.Physical.Mechanical.Dynamics.RigidBody6DOF body(
     mass = 2, p_start = {2, 1, 5}, v_start = {1, 2, 3});
 equation
   body.force_b = zeros(3);

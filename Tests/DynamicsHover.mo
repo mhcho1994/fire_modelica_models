@@ -1,6 +1,6 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model DynamicsHover "Weight balanced by applied thrust"
-  FIRE_Modelica.Physical.Mechanical.Dynamics.RigidBody6DOF body(
+  fire_modelica_models.Physical.Mechanical.Dynamics.RigidBody6DOF body(
     mass = 2, p_start = {0, 0, 1});
 equation
   body.force_b = {0, 0, 19.62};

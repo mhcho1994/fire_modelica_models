@@ -1,9 +1,9 @@
-within FIRE_Modelica.Physical.Mechanical.Chassis;
+within fire_modelica_models.Physical.Mechanical.Chassis;
 
 model ChassisAssembly "Select an aggregate budget or assemble rigid component mass properties"
   parameter Boolean useAssembledMass = false
     "False uses aggregate exclusively; true uses constituents exclusively";
-  parameter FIRE_Modelica.Physical.Mechanical.MassProperties aggregate(
+  parameter fire_modelica_models.Physical.Mechanical.MassProperties aggregate(
     mass = 1, inertia = diagonal({0.01, 0.01, 0.01}));
   parameter CenterBody.RigidCenterBody core;
   parameter Integer nArms(min = 0) = 0;
@@ -12,9 +12,9 @@ model ChassisAssembly "Select an aggregate budget or assemble rigid component ma
   parameter Payloads.FixedPayload payloads[nPayloads];
   parameter Integer nAdditionalParts(min = 0) = 0
     "Motor, battery, sensors, and other masses not already included above";
-  parameter FIRE_Modelica.Physical.Mechanical.MassProperties additionalParts[nAdditionalParts];
+  parameter fire_modelica_models.Physical.Mechanical.MassProperties additionalParts[nAdditionalParts];
 
-  final parameter FIRE_Modelica.Physical.Mechanical.MassProperties properties =
+  final parameter fire_modelica_models.Physical.Mechanical.MassProperties properties =
     if useAssembledMass then
       Functions.combineMassProperties(cat(1, {core}, arms, payloads, additionalParts))
     else Functions.combineMassProperties({aggregate});

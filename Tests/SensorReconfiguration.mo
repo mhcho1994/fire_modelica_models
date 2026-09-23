@@ -1,4 +1,4 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model SensorReconfiguration "Replace measurement and response components without changing sensor interfaces"
   model ScaledImu "Test-only measurement replacement with a known scale factor"

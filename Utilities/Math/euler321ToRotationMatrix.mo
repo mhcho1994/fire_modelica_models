@@ -1,4 +1,4 @@
-within FIRE_Modelica.Utilities.Math;
+within fire_modelica_models.Utilities.Math;
 
 function euler321ToRotationMatrix
   input Real euler[3] "Roll, pitch, yaw [rad]";

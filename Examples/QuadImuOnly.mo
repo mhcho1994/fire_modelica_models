@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 
 model QuadImuOnly "Direct IMU composition for a sensor experiment, without SensorSuite"
   Vehicles.Copter.MultirotorPlant vehicle(

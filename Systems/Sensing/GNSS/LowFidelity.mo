@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.GNSS;
+within fire_modelica_models.Systems.Sensing.GNSS;
 
 model LowFidelity
   parameter Real samplePeriod = 0.2 "GNSS sample period [s]";

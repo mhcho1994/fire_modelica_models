@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.IMU.BaseClasses;
+within fire_modelica_models.Systems.Sensing.IMU.BaseClasses;
 
 partial model PartialMeasurement "Continuous observable contract; no bias or sampling"
   parameter Real r_b[3](each unit="m") = zeros(3) "Sensor position relative to CG";

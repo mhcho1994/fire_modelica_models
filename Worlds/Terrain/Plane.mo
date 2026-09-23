@@ -1,4 +1,4 @@
-within FIRE_Modelica.Worlds.Terrain;
+within fire_modelica_models.Worlds.Terrain;
 
 model Plane "Horizontal or inclined translating plane with a unit outward normal"
   parameter Real point_w[3](each unit = "m") = {0, 0, 0}

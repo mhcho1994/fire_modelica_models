@@ -1,4 +1,4 @@
-within FIRE_Modelica.Physical.Mechanical.Chassis.LandingGear;
+within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
 
 model CompliantPointLeg "Fixed leg tip with unilateral spring-damper ground contact"
   parameter Real rLeg_b[3](each unit = "m") = {0, 0, -0.1}
@@ -26,10 +26,10 @@ model CompliantPointLeg "Fixed leg tip with unilateral spring-damper ground cont
   output Real tipVelocity_w[3](each unit = "m/s");
   output Real tangentialPower(unit = "W");
 
-  FIRE_Modelica.Physical.Mechanical.Contact.ContactMode mode;
-  FIRE_Modelica.Physical.Mechanical.Contact.UnilateralSpringDamper normalLaw(
+  fire_modelica_models.Physical.Mechanical.Contact.ContactMode mode;
+  fire_modelica_models.Physical.Mechanical.Contact.UnilateralSpringDamper normalLaw(
     stiffness = stiffness, damping = damping);
-  FIRE_Modelica.Physical.Mechanical.Contact.TangentialFriction frictionLaw(
+  fire_modelica_models.Physical.Mechanical.Contact.TangentialFriction frictionLaw(
     tangentialDamping = tangentialDamping, frictionCoefficient = frictionCoefficient);
 protected
   Real relativeVelocity_w[3](each unit = "m/s");

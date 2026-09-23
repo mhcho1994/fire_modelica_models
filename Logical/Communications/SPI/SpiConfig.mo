@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.SPI;
+within fire_modelica_models.Logical.Communications.SPI;
 
 record SpiConfig
   parameter Integer clockRate(min = 1) = 1000000 "SPI clock rate [Hz]";

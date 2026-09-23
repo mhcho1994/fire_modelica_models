@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.GNSS.BaseClasses;
+within fire_modelica_models.Systems.Sensing.GNSS.BaseClasses;
 
 model IdealMeasurement "Default kinematic/environment observables without device dynamics"
   extends PartialMeasurement;

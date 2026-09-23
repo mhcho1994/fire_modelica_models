@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Propulsion;
+within fire_modelica_models.Systems.Propulsion;
 partial model PartialSpeedDrivenRotor "Common parameters for empirical speed-driven rotor profiles"
   extends PartialRotorUnit;
   parameter Modelica.Units.SI.Time tau = 0.02;

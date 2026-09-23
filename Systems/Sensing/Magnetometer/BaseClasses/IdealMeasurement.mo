@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.Magnetometer.BaseClasses;
+within fire_modelica_models.Systems.Sensing.Magnetometer.BaseClasses;
 
 model IdealMeasurement "Default kinematic/environment observables without device dynamics"
   extends PartialMeasurement;

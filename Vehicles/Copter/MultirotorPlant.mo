@@ -1,4 +1,4 @@
-within FIRE_Modelica.Vehicles.Copter;
+within fire_modelica_models.Vehicles.Copter;
 model MultirotorPlant "N-rotor rigid vehicle, ENU world / FLU at combined CG"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Boolean useAssembledMass = false;

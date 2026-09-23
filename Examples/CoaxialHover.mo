@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 model CoaxialHover
   extends QuadHover(geometry=Vehicles.Copter.Presets.CoaxialX8());
 end CoaxialHover;

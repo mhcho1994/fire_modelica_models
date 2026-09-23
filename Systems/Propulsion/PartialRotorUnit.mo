@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Propulsion;
+within fire_modelica_models.Systems.Propulsion;
 partial model PartialRotorUnit "Rotor hub interface before mounting and CG moment translation"
   parameter Modelica.Units.SI.AngularVelocity omegaMax = 1000;
   parameter Integer spinSign = 1 "Right-hand rotation about positive thrust axis";

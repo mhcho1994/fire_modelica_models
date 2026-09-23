@@ -1,8 +1,8 @@
-within FIRE_Modelica.Systems.Sensing.Magnetometer;
+within fire_modelica_models.Systems.Sensing.Magnetometer;
 
 model LowFidelity
-  import FIRE_Modelica.Utilities.Math.euler321ToRotationMatrix;
-  import FIRE_Modelica.Utilities.Math.rotateBodyToSensor;
+  import fire_modelica_models.Utilities.Math.euler321ToRotationMatrix;
+  import fire_modelica_models.Utilities.Math.rotateBodyToSensor;
 
   parameter Real samplePeriod = 0.02 "Magnetometer sample period [s]";
   parameter Real mountRoll = 0 "Sensor roll mounting angle relative to body [rad]";

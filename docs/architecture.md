@@ -52,7 +52,8 @@ FastDyn 값 adapter의 IMU/magnetometer 출력은 sensor mount 회전을 되돌�
 
 | 이전 | 정식 경로 / 호환 방식 |
 |---|---|
-| `FIRE_Modelica_Update` | `FIRE_Modelica`; 별도 compat package를 로드하면 이전 이름도 사용 가능 |
+| `FIRE_Modelica.*` | `fire_modelica_models.*`; 폴더명과 일치하도록 최상위 namespace 변경. 외부 참조를 갱신하고 생성 모델은 TOML에서 재생성 |
+| `FIRE_Modelica_Update` | `fire_modelica_models`; 별도 compat package를 로드하면 이전 이름도 사용 가능 |
 | `Communications` | `Logical.Communications`; root에 alias |
 | `Worlds.Envioronment` | `Worlds.Environment`; 오탈자 alias |
 | `Actuators.PwmActuator`, `Adapters.Legacy.PwmActuator` | `Adapters.Legacy.PwmCommandAdapter`; 기존 정규화·sample 식 유지, 이전 이름 별칭 없음 |

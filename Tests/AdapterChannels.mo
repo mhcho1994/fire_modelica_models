@@ -1,4 +1,4 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model AdapterChannels "Eight independent PWM channels, clipping and value frame conversions"
   Adapters.FastDyn.MultirotorValueAdapter adapter(geometry=Vehicles.Copter.Presets.OctoX(
       R_bImu=[0,-1,0;1,0,0;0,0,1],R_bMag=diagonal({1,-1,-1})),

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.Magnetometer.BaseClasses;
+within fire_modelica_models.Systems.Sensing.Magnetometer.BaseClasses;
 
 partial model PartialMeasurement "Continuous observable contract; no bias or sampling"
   parameter Real R_bs[3,3] = identity(3) "Sensor to body rotation";

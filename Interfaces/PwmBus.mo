@@ -1,4 +1,4 @@
-within FIRE_Modelica.Interfaces;
+within fire_modelica_models.Interfaces;
 
 expandable connector PwmBus
   Real ch_0 "SITL servo channel 0";

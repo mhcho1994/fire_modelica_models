@@ -1,4 +1,4 @@
-within FIRE_Modelica.Worlds;
+within fire_modelica_models.Worlds;
 
 package Terrain
 end Terrain;

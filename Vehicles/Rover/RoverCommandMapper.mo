@@ -1,7 +1,7 @@
-within FIRE_Modelica.Vehicles.Rover;
+within fire_modelica_models.Vehicles.Rover;
 
 model RoverCommandMapper
-  import FIRE_Modelica.Utilities.Math.clip;
+  import fire_modelica_models.Utilities.Math.clip;
 
   parameter Boolean skidSteering = false
     "Interpret actuator channels as left/right motor commands";
@@ -13,7 +13,7 @@ model RoverCommandMapper
     "Normalized actuator channel used for steering";
   parameter Integer throttleChannel(min = 1) = 2
     "Normalized actuator channel used for throttle";
-  parameter Real vectoredAngleMax = 90 * FIRE_Modelica.Utilities.Constants.d2r
+  parameter Real vectoredAngleMax = 90 * fire_modelica_models.Utilities.Constants.d2r
     "Maximum vector angle [rad]";
 
   Modelica.Blocks.Interfaces.RealInput actuatorCommand[nChannels] annotation(

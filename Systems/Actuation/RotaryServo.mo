@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Actuation;
+within fire_modelica_models.Systems.Actuation;
 
 model RotaryServo
   "Rotary servo with angle limits and first-order lag"

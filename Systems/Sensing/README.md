@@ -2,7 +2,7 @@
 
 The canonical sensor families are `Systems.Sensing.IMU`, `Magnetometer`, `GNSS`,
 and `Barometer`. The former top-level `Sensors` package has been removed; update
-external class references to `FIRE_Modelica.Systems.Sensing` as well.
+external class references to `fire_modelica_models.Systems.Sensing` as well.
 
 `SensorSuite` is an optional default assembly of four sensors. A vehicle or
 experiment may instantiate individual sensors directly, including multiple
@@ -58,11 +58,11 @@ frame conversion. Its dimension is fixed by each assembly (`final n`).
 A directly placed IMU with different acceleration/gyro time constants:
 
 ```modelica
-FIRE_Modelica.Systems.Sensing.IMU.Sensor imu(
+fire_modelica_models.Systems.Sensing.IMU.Sensor imu(
   samplePeriod=0.0025,
   accelBias={0.01,0,0},
   redeclare model Response =
-    FIRE_Modelica.Systems.Sensing.ResponseModels.FirstOrder(
+    fire_modelica_models.Systems.Sensing.ResponseModels.FirstOrder(
       tau={0.01,0.01,0.01,0.005,0.005,0.005}));
 ```
 
@@ -71,9 +71,9 @@ Connect its motion/gravity inputs as shown in `Examples.QuadImuOnly`.
 The same modifier works inside the optional suite:
 
 ```modelica
-FIRE_Modelica.Systems.Sensing.SensorSuite sensors(
+fire_modelica_models.Systems.Sensing.SensorSuite sensors(
   imu(redeclare model Response =
-    FIRE_Modelica.Systems.Sensing.ResponseModels.FirstOrder(
+    fire_modelica_models.Systems.Sensing.ResponseModels.FirstOrder(
       tau={0.01,0.01,0.01,0,0,0})));
 ```
 

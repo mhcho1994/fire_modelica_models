@@ -1,5 +1,5 @@
-within FIRE_Modelica.Vehicles.FixedWing;
+within fire_modelica_models.Vehicles.FixedWing;
 
 partial model FixedWingBase
-  extends FIRE_Modelica.Vehicles.Common.Vehicle6DOF;
+  extends fire_modelica_models.Vehicles.Common.Vehicle6DOF;
 end FixedWingBase;

@@ -1,12 +1,12 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model PropulsionStep "Analytical speed step, opposite yaw torques, and demand limits"
-  FIRE_Modelica.Systems.Propulsion.SpeedDrivenRotor ccw(
+  fire_modelica_models.Systems.Propulsion.SpeedDrivenRotor ccw(
     omegaMax = 100, tau = 0.05, kT = 1e-3, kQ = 2e-5, spinSign = 1);
-  FIRE_Modelica.Systems.Propulsion.SpeedDrivenRotor cw(
+  fire_modelica_models.Systems.Propulsion.SpeedDrivenRotor cw(
     omegaMax = 100, tau = 0.05, kT = 1e-3, kQ = 2e-5, spinSign = -1);
-  FIRE_Modelica.Systems.Propulsion.ResponseModels.FirstOrderSpeed saturated(
+  fire_modelica_models.Systems.Propulsion.ResponseModels.FirstOrderSpeed saturated(
     omegaMax = 100, tau = 0.05);
-  FIRE_Modelica.Systems.Propulsion.ResponseModels.FirstOrderSpeed stopped(
+  fire_modelica_models.Systems.Propulsion.ResponseModels.FirstOrderSpeed stopped(
     omegaMax = 100, tau = 0.05);
   Real expectedSpeed;
 equation

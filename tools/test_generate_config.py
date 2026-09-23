@@ -198,6 +198,22 @@ class ConfigurationTests(unittest.TestCase):
                     generator.generate(config, build)
             self.assertEqual(original.read_text(), "model User end User;\n")
 
+    def test_previous_namespace_outputs_can_be_regenerated(self):
+        with tempfile.TemporaryDirectory() as work:
+            config = generator.ROOT / "configs/quad.toml"
+            model, manifest_path = generator.generate(config, work)
+            model.write_text(model.read_text().replace("fire_modelica_models", "FIRE_Modelica"))
+            manifest = json.loads(manifest_path.read_text())
+            manifest["generator_id"] = "FIRE_Modelica/tools/generate_config.py"
+            manifest["generated_model_sha256"] = generator.hashlib.sha256(model.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            generator.generate(config, work)
+            self.assertIn("extends fire_modelica_models.", model.read_text())
+            self.assertNotIn("FIRE_Modelica", model.read_text())
+            updated = json.loads(manifest_path.read_text())
+            self.assertEqual(updated["generator_id"], generator.GENERATOR_ID)
+            self.assertEqual(updated["generated_model_sha256"], generator.hashlib.sha256(model.read_bytes()).hexdigest())
+
     def test_repeated_generation_has_stable_source_digest(self):
         with tempfile.TemporaryDirectory() as work:
             root = Path(work) / "source"
@@ -220,7 +236,7 @@ class ConfigurationTests(unittest.TestCase):
             for path in sorted((generator.ROOT / "configs").glob("*.toml")):
                 model, manifest_path = generator.generate(path, work)
                 manifest = json.loads(manifest_path.read_text())
-                self.assertIn("extends FIRE_Modelica.Vehicles.Copter.MultirotorWithSensors", model.read_text())
+                self.assertIn("extends fire_modelica_models.Vehicles.Copter.MultirotorWithSensors", model.read_text())
                 self.assertEqual(manifest["target"], "openmodelica-native")
                 self.assertEqual(manifest["verification"]["simulation"], "not_run")
                 self.assertEqual(manifest["verification"]["openmodelica_checkModel"], "not_run")

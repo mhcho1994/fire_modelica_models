@@ -1,9 +1,9 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model SensorPhysics "Specific force, rigid lever arm, sensor rotation, and bias checks"
-  FIRE_Modelica.Systems.Sensing.IMU.Sensor freefall(samplePeriod=0.01);
-  FIRE_Modelica.Systems.Sensing.IMU.Sensor supported(samplePeriod=0.01);
-  FIRE_Modelica.Systems.Sensing.IMU.Sensor lever(
+  fire_modelica_models.Systems.Sensing.IMU.Sensor freefall(samplePeriod=0.01);
+  fire_modelica_models.Systems.Sensing.IMU.Sensor supported(samplePeriod=0.01);
+  fire_modelica_models.Systems.Sensing.IMU.Sensor lever(
     samplePeriod=0.01, r_b={1,0,0}, R_bs=[0,-1,0; 1,0,0; 0,0,1],
     accelBias={0.1,0.2,0.3}, gyroBias={0.1,0.2,0.3});
 equation

@@ -1,7 +1,7 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model DynamicsFullInertia "Manufactured angular trajectory with off-diagonal inertia"
   parameter Real J[3, 3] = [2, 0.3, -0.2; 0.3, 3, 0.4; -0.2, 0.4, 4];
-  FIRE_Modelica.Physical.Mechanical.Dynamics.RigidBody6DOF body(
+  fire_modelica_models.Physical.Mechanical.Dynamics.RigidBody6DOF body(
     inertia = J, omega_start = {0.1, 0.2, -0.1});
   Real expectedOmega[3];
 equation

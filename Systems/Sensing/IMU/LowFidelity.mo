@@ -1,8 +1,8 @@
-within FIRE_Modelica.Systems.Sensing.IMU;
+within fire_modelica_models.Systems.Sensing.IMU;
 
 model LowFidelity
-  import FIRE_Modelica.Utilities.Math.rotateBodyToSensor;
-  import FIRE_Modelica.Utilities.Math.wrapPi;
+  import fire_modelica_models.Utilities.Math.rotateBodyToSensor;
+  import fire_modelica_models.Utilities.Math.wrapPi;
 
   parameter Real samplePeriod = 0.0025 "IMU sample period [s]";
   parameter Real mountRoll = 0 "Sensor roll mounting angle relative to body [rad]";

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 model RotorReplacement "Replaceable rotor array preserves common speed-profile parameters"
   model ReducedThrustRotor
     extends Systems.Propulsion.SpeedDrivenRotor(blade(kT=0.5*kT));

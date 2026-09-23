@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.UART;
+within fire_modelica_models.Logical.Communications.UART;
 
 record UartConfig
   parameter Integer baudRate(min = 1) = 115200 "UART baud rate [bit/s]";

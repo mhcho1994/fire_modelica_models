@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.Barometer.BaseClasses;
+within fire_modelica_models.Systems.Sensing.Barometer.BaseClasses;
 
 model IdealMeasurement "Default kinematic/environment observables without device dynamics"
   extends PartialMeasurement;

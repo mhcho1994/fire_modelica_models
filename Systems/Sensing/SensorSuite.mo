@@ -1,6 +1,7 @@
-within FIRE_Modelica.Systems.Sensing;
+within fire_modelica_models.Systems.Sensing;
 
 model SensorSuite "Optional four-sensor assembly; each sensor owns its sampling and measurement behavior"
+  parameter Boolean sampled = true "Sample and hold, or continuous response outputs";
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
   parameter Real R_bImu[3,3] = identity(3) "IMU frame to body";
   parameter Real R_bMag[3,3] = identity(3) "Magnetometer frame to body";
@@ -28,17 +29,17 @@ model SensorSuite "Optional four-sensor assembly; each sensor owns its sampling 
   input Real magneticField_w[3];
   input Real pressure "Ambient pressure supplied by the environment [Pa]";
   input Real temperature "Ambient temperature supplied by the environment [K]";
-  output FIRE_Modelica.Interfaces.SensorMeasurements measurements;
+  output fire_modelica_models.Interfaces.SensorMeasurements measurements;
 
   IMU.Sensor imu(
-    samplePeriod=imuSamplePeriod, r_b=rImu_b, R_bs=R_bImu,
+    sampled=sampled, samplePeriod=imuSamplePeriod, r_b=rImu_b, R_bs=R_bImu,
     accelBias=accelBias, gyroBias=gyroBias);
   Magnetometer.Sensor magnetometer(
-    samplePeriod=magnetometerSamplePeriod, R_bs=R_bMag, bias=magBias);
+    sampled=sampled, samplePeriod=magnetometerSamplePeriod, R_bs=R_bMag, bias=magBias);
   GNSS.Sensor gnss(
-    samplePeriod=gnssSamplePeriod, positionBias=positionBias, velocityBias=velocityBias);
+    sampled=sampled, samplePeriod=gnssSamplePeriod, positionBias=positionBias, velocityBias=velocityBias);
   Barometer.Sensor barometer(
-    samplePeriod=barometerSamplePeriod, pressureBias=pressureBias,
+    sampled=sampled, samplePeriod=barometerSamplePeriod, pressureBias=pressureBias,
     temperatureBias=temperatureBias, altitudeBias=altitudeBias);
 protected
   Real barometerPosition_w[3];

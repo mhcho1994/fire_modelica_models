@@ -1,6 +1,7 @@
-within FIRE_Modelica.Vehicles.Copter;
+within fire_modelica_models.Vehicles.Copter;
 model MultirotorWithSensors "Value-level sampled sensor profile; no protocol/firmware driver"
   extends MultirotorPlant;
+  parameter Boolean sampledSensors = true;
   parameter Real imuSamplePeriod = 0.0025;
   parameter Real magnetometerSamplePeriod = 0.02;
   parameter Real gnssSamplePeriod = 0.2;
@@ -9,6 +10,7 @@ model MultirotorWithSensors "Value-level sampled sensor profile; no protocol/fir
   input Real pressure = 101325 "Constant ambient pressure baseline [Pa]";
   input Real temperature = 288.15 "K";
   Systems.Sensing.SensorSuite sensors(
+    sampled=sampledSensors,
     rImu_b=geometry.imuPosition_C-chassis.cg_C,R_bImu=geometry.R_bImu,R_bMag=geometry.R_bMag,
     rGnss_b=geometry.gnssPosition_C-chassis.cg_C,rBarometer_b=geometry.barometerPosition_C-chassis.cg_C,
     imuSamplePeriod=imuSamplePeriod,magnetometerSamplePeriod=magnetometerSamplePeriod,

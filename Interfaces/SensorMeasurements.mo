@@ -1,4 +1,4 @@
-within FIRE_Modelica.Interfaces;
+within fire_modelica_models.Interfaces;
 
 record SensorMeasurements "Sampled measurements with acquisition times, without attitude truth"
   Real acceleration[3](each unit="m/s2") "Specific force in IMU sensor frame";

@@ -1,4 +1,4 @@
-within FIRE_Modelica.Vehicles.Rover;
+within fire_modelica_models.Vehicles.Rover;
 
 model R1Rover
   parameter Boolean skidSteering = false;

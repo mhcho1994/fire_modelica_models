@@ -1,8 +1,10 @@
-# FIRE_Modelica
+# fire_modelica_models
 
 멀티로터의 강체 운동, 추진계, Chassis·고정 payload, 접촉 전환, 네 종류의 sampled sensor를 조립하는 Modelica 라이브러리입니다. `FIRE_Modelica_Architecture_Proposal.md`의 **초기 구현 범위**를 적용했습니다. 기존 fixed wing·rover 예제와 센서는 호환 경로로 유지합니다.
 
-라이브러리 디렉터리와 정식 namespace는 모두 `FIRE_Modelica`입니다. IDE나 외부 빌드 설정도 새 `FIRE_Modelica/package.mo` 경로를 사용해야 합니다. `_Update` 보조 namespace 역시 `FIRE_Modelica_Update`로 통일했습니다.
+라이브러리 디렉터리와 정식 namespace는 모두 `fire_modelica_models`입니다. OpenModelica/OMEdit에서 이 디렉터리의 `package.mo`를 직접 열면 됩니다. 이전 `FIRE_Modelica.*` 참조는 `fire_modelica_models.*`로 변경해야 합니다. `FIRE_Modelica_Update`는 별도로 로드하는 기존 호환 namespace로 유지합니다.
+
+`MODELICAPATH`에는 `fire_modelica_models`의 부모 디렉터리를 추가하고 `loadModel(fire_modelica_models)`로 로드할 수 있습니다. 예를 들어 모델의 전체 이름은 `fire_modelica_models.Examples.QuadHover`입니다. 생성된 모델은 기존 TOML로 다시 생성하세요. Python/Rust 생성기는 이전 이름으로 만든 산출물도 인식하여 갱신합니다.
 
 ## 시작하기
 
@@ -83,7 +85,7 @@ Examples/  Tests/  configs/  tools/  docs/  upstream/
 
 ## 기존 코드와 host 연결
 
-정식 namespace는 `FIRE_Modelica`입니다. 이전 namespace가 필요하면 정식 `package.mo`를 먼저 로드하고 `compat/FIRE_Modelica_Update/package.mo`를 추가로 로드합니다. 이전 `Communications`와 `Worlds.Envioronment`에는 호환 별칭이 있습니다. 최상위 `Actuators`와 그 하위 별칭은 제거했습니다. Servo는 `Systems.Actuation.RotaryServo`, 기존 PWM 정규화는 `Adapters.Legacy.PwmCommandAdapter`를 직접 사용합니다. 이전 root namespace를 로드해도 제거한 `Actuators` 경로가 복원되지는 않습니다.
+정식 namespace는 `fire_modelica_models`입니다. 이전 namespace가 필요하면 정식 `package.mo`를 먼저 로드하고 `compat/FIRE_Modelica_Update/package.mo`를 추가로 로드합니다. 이전 `Communications`와 `Worlds.Envioronment`에는 호환 별칭이 있습니다. 최상위 `Actuators`와 그 하위 별칭은 제거했습니다. Servo는 `Systems.Actuation.RotaryServo`, 기존 PWM 정규화는 `Adapters.Legacy.PwmCommandAdapter`를 직접 사용합니다. 이전 root namespace를 로드해도 제거한 `Actuators` 경로가 복원되지는 않습니다.
 
 `PwmCommandAdapter`는 수치 PWM 명령을 sampling하고 정규화하는 adapter이며 물리 actuator가 아닙니다. FixedWing·Rover는 이 모델을 직접 참조하고 기존 sampling·정규화 동작을 유지합니다. 기체 내부 instance 이름 `pwmActuator`는 기존 modifier 경로 보존을 위해 유지했습니다. `Actuators.PwmActuator` 및 `Adapters.Legacy.PwmActuator`를 사용하는 외부 class 선언은 새 이름으로 바꿔야 합니다. Motor·blade 조립은 `Systems.Propulsion`, servo 등 actuator 조립은 `Systems.Actuation`에 둡니다.
 

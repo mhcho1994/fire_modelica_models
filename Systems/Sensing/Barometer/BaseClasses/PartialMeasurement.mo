@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.Barometer.BaseClasses;
+within fire_modelica_models.Systems.Sensing.Barometer.BaseClasses;
 
 partial model PartialMeasurement "Continuous observable contract; no bias or sampling"
   input Real ambientPressure(unit="Pa");

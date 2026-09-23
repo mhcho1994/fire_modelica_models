@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.PWM;
+within fire_modelica_models.Logical.Communications.PWM;
 
 type ActiveLevel = enumeration(
   activeHigh "Pulse is active high",

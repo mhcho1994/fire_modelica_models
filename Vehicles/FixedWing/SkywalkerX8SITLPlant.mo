@@ -1,8 +1,8 @@
-within FIRE_Modelica.Vehicles.FixedWing;
+within fire_modelica_models.Vehicles.FixedWing;
 
 model SkywalkerX8SITLPlant
-  import FIRE_Modelica.Utilities.Math.clip;
-  import FIRE_Modelica.Utilities.Math.wrapPi;
+  import fire_modelica_models.Utilities.Math.clip;
+  import fire_modelica_models.Utilities.Math.wrapPi;
 
   extends FixedWingBase;
 
@@ -15,9 +15,9 @@ model SkywalkerX8SITLPlant
   parameter Real minAirspeed = 10.0 "Minimum trimmed flight speed [m/s]";
   parameter Real maxAirspeed = 28.0 "Maximum trimmed flight speed [m/s]";
   parameter Real speedTimeConstant = 1.5 "Throttle response time constant [s]";
-  parameter Real maxRollRate = 120 * FIRE_Modelica.Utilities.Constants.d2r
+  parameter Real maxRollRate = 120 * fire_modelica_models.Utilities.Constants.d2r
     "Roll rate at full differential elevon [rad/s]";
-  parameter Real maxPitchRate = 60 * FIRE_Modelica.Utilities.Constants.d2r
+  parameter Real maxPitchRate = 60 * fire_modelica_models.Utilities.Constants.d2r
     "Pitch rate at full symmetric elevon [rad/s]";
   parameter Real rollDamping = 1.6 "Roll damping coefficient [1/s]";
   parameter Real pitchDamping = 1.2 "Pitch damping coefficient [1/s]";
@@ -67,10 +67,10 @@ equation
   pitchCommand = clip(0.5 * (leftElevonLimited + rightElevonLimited), -1, 1);
   targetAirspeed = minAirspeed + throttleLimited * (maxAirspeed - minAirspeed);
 
-  longitudinalAccel = (targetAirspeed - speed) / max(speedTimeConstant, FIRE_Modelica.Utilities.Constants.eps);
+  longitudinalAccel = (targetAirspeed - speed) / max(speedTimeConstant, fire_modelica_models.Utilities.Constants.eps);
   rollRate = maxRollRate * rollCommand - rollDamping * phi;
   pitchRate = maxPitchRate * pitchCommand - pitchDamping * theta;
-  yawRate = FIRE_Modelica.Utilities.Constants.g * tan(phi) / max(speed, 1.0);
+  yawRate = fire_modelica_models.Utilities.Constants.g * tan(phi) / max(speed, 1.0);
 
   der(speed) = longitudinalAccel;
   der(phi) = rollRate;
@@ -83,7 +83,7 @@ equation
   position = {x, y, z};
   velocityWorld = {speed * cos(theta) * cos(psi), speed * cos(theta) * sin(psi), speed * sin(theta)};
   velocityBody = {speed, 0, 0};
-  accelerationBody = {longitudinalAccel, 0, -FIRE_Modelica.Utilities.Constants.g};
+  accelerationBody = {longitudinalAccel, 0, -fire_modelica_models.Utilities.Constants.g};
   euler = {phi, theta, wrapPi(psi)};
   rates = {rollRate, pitchRate, yawRate};
 end SkywalkerX8SITLPlant;

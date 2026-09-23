@@ -1,4 +1,4 @@
-within FIRE_Modelica.Utilities;
+within fire_modelica_models.Utilities;
 
 package Math
 end Math;

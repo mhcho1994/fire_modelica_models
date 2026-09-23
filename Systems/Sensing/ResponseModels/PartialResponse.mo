@@ -1,4 +1,4 @@
-within FIRE_Modelica.Systems.Sensing.ResponseModels;
+within fire_modelica_models.Systems.Sensing.ResponseModels;
 
 partial model PartialResponse "Preserve the count, ordering and SI units of measurement channels"
   parameter Integer n(min=1) = 1;

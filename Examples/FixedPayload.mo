@@ -1,4 +1,4 @@
-within FIRE_Modelica.Examples;
+within fire_modelica_models.Examples;
 model FixedPayload "Offset rigid payload changes mass, CG, inertia and every mount"
   Vehicles.Copter.MultirotorWithSensors vehicle(useAssembledMass=true,
     nPayloads=1,payloads={Physical.Mechanical.Chassis.Payloads.FixedPayload(

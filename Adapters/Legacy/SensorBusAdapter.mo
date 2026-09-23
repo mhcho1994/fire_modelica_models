@@ -1,4 +1,4 @@
-within FIRE_Modelica.Adapters.Legacy;
+within fire_modelica_models.Adapters.Legacy;
 model SensorBusAdapter "Explicit mixed truth/measurement compatibility view"
   parameter Real R_bImu[3,3]=identity(3) "IMU sensor axes to body FLU";
   parameter Real R_bMag[3,3]=identity(3) "Magnetometer sensor axes to body FLU";

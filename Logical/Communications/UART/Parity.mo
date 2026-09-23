@@ -1,4 +1,4 @@
-within FIRE_Modelica.Logical.Communications.UART;
+within fire_modelica_models.Logical.Communications.UART;
 
 type Parity = enumeration(
   none "No parity bit",

@@ -1,8 +1,8 @@
-within FIRE_Modelica.Tests;
+within fire_modelica_models.Tests;
 
 model SensorSampling "Right-limit initial samples, independent clocks, holding, bias, and antenna mount"
   parameter Real temperatureSlope(unit="K/s") = 1;
-  FIRE_Modelica.Systems.Sensing.SensorSuite suite(
+  fire_modelica_models.Systems.Sensing.SensorSuite suite(
     imuSamplePeriod=0.01, magnetometerSamplePeriod=0.02,
     gnssSamplePeriod=0.1, barometerSamplePeriod=0.05,
     R_bMag=[0,-1,0; 1,0,0; 0,0,1], rGnss_b={1,0,0},
