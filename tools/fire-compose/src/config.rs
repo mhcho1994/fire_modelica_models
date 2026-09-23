@@ -474,7 +474,39 @@ fn defaults(
 }
 
 pub fn parse(source: &str) -> Result<ResolvedFireConfig> {
-    let raw: Value = toml::from_str(source).map_err(|e| e.to_string())?;
+    parse_at(source, None)
+}
+
+/// Select a TOML table before applying the standalone physics schema.
+/// The selector uses TOML dotted-key syntax, including quoted key segments.
+pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> {
+    let mut raw: Value = toml::from_str(source).map_err(|e| e.to_string())?;
+    if let Some(path) = path {
+        let selector: Value = toml::from_str(&format!("[{path}]"))
+            .map_err(|e| format!("invalid config table path {path:?}: {e}"))?;
+        let mut cursor = &selector;
+        let mut selected = &raw;
+        loop {
+            let keys = cursor
+                .as_table()
+                .ok_or("config table path must name a table")?;
+            if keys.is_empty() {
+                break;
+            }
+            if keys.len() != 1 {
+                return Err("config table path must name exactly one table".into());
+            }
+            let (key, child) = keys.iter().next().unwrap();
+            selected = selected
+                .get(key)
+                .ok_or_else(|| format!("config table {path:?} not found"))?;
+            cursor = child;
+        }
+        if !selected.is_table() {
+            return Err(format!("config table {path:?} must be a table"));
+        }
+        raw = selected.clone();
+    }
     let root = raw.as_table().ok_or("configuration must be a table")?;
     let version = root
         .get("schema_version")

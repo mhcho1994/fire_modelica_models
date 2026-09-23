@@ -9,6 +9,13 @@ cargo run --locked --manifest-path tools/fire-compose/Cargo.toml -- emit configs
 cargo run --locked --manifest-path tools/fire-compose/Cargo.toml -- check configs/quad.toml
 ```
 
+When the physics configuration is embedded in a larger TOML file, pass
+`--config-table FMU.models.quad.physics` to `validate`, `emit`, or `check`.
+The path uses TOML dotted-key syntax (quoted key segments are supported).
+Only the selected table is validated against the physics schema; other tables
+may hold host/firmware settings. The manifest hashes the entire input TOML.
+Standalone physics TOML files continue to work without this option.
+
 `plant` (default) exposes normalized `demand[nActuators]`. `--profile fastdyn`
 adds the flat PWM/sensor boundary used by FastDyn. `--output-dir` must be under
 FIRE's `build/` directory or outside the source tree. Hand-authored and symlink

@@ -57,6 +57,42 @@ class RustComposerTests(unittest.TestCase):
                 actual.pop('acquisition')
                 self.assert_config_equal(expected, actual)
 
+    def test_nested_physics_table_matches_standalone_configuration(self):
+        standalone = ('schema_version=2\nmodel_name="NestedHexa"\nacquisition="continuous"\n'
+                      '[geometry]\npreset="HexaX"\nnActuators=6\n')
+        integrated = ('[Machine]\nplatform="STM32F427"\n'
+                      '[FMU.models."hexa.variant".physics]\n'
+                      + standalone.replace('[geometry]', '[FMU.models."hexa.variant".physics.geometry]'))
+        selector = 'FMU.models."hexa.variant".physics'
+        original = self.run_config(standalone, 'validate', '--json')
+        selected = self.run_config(integrated, 'validate', '--config-table', selector, '--json')
+        self.assertEqual(original.returncode, 0, original.stderr)
+        self.assertEqual(selected.returncode, 0, selected.stderr)
+        self.assert_config_equal(json.loads(original.stdout), json.loads(selected.stdout))
+        with tempfile.TemporaryDirectory() as work:
+            for name, raw, extra in [('standalone', standalone, ()),
+                                     ('integrated', integrated, ('--config-table', selector))]:
+                run = self.run_config(raw, 'emit', '--profile', 'fastdyn',
+                                      '--output-dir', str(Path(work) / name), *extra)
+                self.assertEqual(run.returncode, 0, run.stderr)
+            expected = (Path(work) / 'standalone/NestedHexa.mo').read_bytes()
+            self.assertEqual((Path(work) / 'integrated/NestedHexa.mo').read_bytes(), expected)
+
+    def test_invalid_table_selection_does_not_emit(self):
+        valid = '[physics]\nschema_version=2\nmodel_name="SelectedQuad"\n'
+        cases = [(valid, 'missing'), (valid, 'physics.schema_version'), (valid, ''),
+                 (valid, 'physics]\n[other'),
+                 (valid + 'unknown_field=1\n', 'physics'),
+                 (valid + '[physics.motor]\ntau=-1\n', 'physics')]
+        with tempfile.TemporaryDirectory() as work:
+            output = Path(work) / 'generated'
+            for raw, selector in cases:
+                with self.subTest(raw=raw, selector=selector):
+                    run = self.run_config(raw, 'emit', '--config-table', selector,
+                                          '--output-dir', str(output))
+                    self.assertNotEqual(run.returncode, 0)
+                    self.assertFalse(output.exists())
+
     def test_invalid_configuration_does_not_emit(self):
         cases = [
             'schema_version=true',

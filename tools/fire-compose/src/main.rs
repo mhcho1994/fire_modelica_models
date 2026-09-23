@@ -16,6 +16,9 @@ enum Action {
     /// Validate configuration without writing files or invoking a compiler.
     Validate {
         config: PathBuf,
+        /// Read the physics configuration from this TOML table path.
+        #[arg(long)]
+        config_table: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -32,6 +35,9 @@ enum Action {
 #[derive(clap::Args)]
 struct Generate {
     config: PathBuf,
+    /// Read the physics configuration from this TOML table path.
+    #[arg(long)]
+    config_table: Option<String>,
     #[arg(long, default_value = "plant")]
     profile: Profile,
     #[arg(long)]
@@ -55,7 +61,7 @@ impl Profile {
 
 fn generate(args: &Generate) -> Result<(PathBuf, PathBuf, config::ResolvedFireConfig, PathBuf)> {
     let raw = fs::read_to_string(&args.config).map_err(|e| e.to_string())?;
-    let config = config::parse(&raw)?;
+    let config = config::parse_at(&raw, args.config_table.as_deref())?;
     let root = args
         .library_root
         .clone()
@@ -73,8 +79,13 @@ fn generate(args: &Generate) -> Result<(PathBuf, PathBuf, config::ResolvedFireCo
 
 fn run() -> Result<()> {
     match Cli::parse().command {
-        Action::Validate { config: path, json } => {
-            let c = config::parse(&fs::read_to_string(path).map_err(|e| e.to_string())?)?;
+        Action::Validate {
+            config: path,
+            config_table,
+            json,
+        } => {
+            let raw = fs::read_to_string(path).map_err(|e| e.to_string())?;
+            let c = config::parse_at(&raw, config_table.as_deref())?;
             if json {
                 println!(
                     "{}",
