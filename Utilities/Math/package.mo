@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Utilities;
+within FIRE_Modelica.Utilities;
 
 package Math
 end Math;

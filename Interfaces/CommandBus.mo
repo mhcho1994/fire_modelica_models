@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Interfaces;
+within FIRE_Modelica.Interfaces;
 
 expandable connector CommandBus
   Real steering "Normalized steering command [-1, 1]";

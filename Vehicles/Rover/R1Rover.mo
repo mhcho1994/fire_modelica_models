@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Vehicles.Rover;
+within FIRE_Modelica.Vehicles.Rover;
 
 model R1Rover
   parameter Boolean skidSteering = false;
@@ -14,7 +14,7 @@ model R1Rover
   Interfaces.SensorBus sensor annotation(
     Placement(transformation(extent = {{90, -10}, {110, 10}})));
 
-  Actuators.PwmActuator pwmActuator(
+  Adapters.Legacy.PwmCommandAdapter pwmActuator(
     nChannels = 2,
     samplePeriod = actuatorSamplePeriod);
   RoverCommandMapper commandMapper(
@@ -24,10 +24,10 @@ model R1Rover
   R1RoverSITLPlant plant(
     skidSteering = skidSteering,
     vectoredThrust = vectoredThrust);
-  Sensors.Barometer.LowFidelity barometer(samplePeriod = sensorSamplePeriod);
-  Sensors.GNSS.LowFidelity gnss(samplePeriod = gnssSamplePeriod);
-  Sensors.IMU.LowFidelity imu(samplePeriod = sensorSamplePeriod);
-  Sensors.Magnetometer.LowFidelity magnetometer(samplePeriod = sensorSamplePeriod);
+  Systems.Sensing.Barometer.LowFidelity barometer(samplePeriod = sensorSamplePeriod);
+  Systems.Sensing.GNSS.LowFidelity gnss(samplePeriod = gnssSamplePeriod);
+  Systems.Sensing.IMU.LowFidelity imu(samplePeriod = sensorSamplePeriod);
+  Systems.Sensing.Magnetometer.LowFidelity magnetometer(samplePeriod = sensorSamplePeriod);
 
 equation
   connect(pwm.ch_0, pwmActuator.pwmCommand[1]);

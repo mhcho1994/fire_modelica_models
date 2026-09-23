@@ -1,7 +1,12 @@
 Interfaces
 Utilities
+Data
+Physical
+Logical
 Worlds
-Actuators
-Sensors
+Systems
+Adapters
 Vehicles
 Examples
+Tests
+Communications

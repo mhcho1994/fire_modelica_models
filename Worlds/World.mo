@@ -1,10 +1,10 @@
-within FIRE_CP_Modelica_Update.Worlds;
+within FIRE_Modelica.Worlds;
 
 model World
-  Envioronment.Gravity gravityModel;
-  Envioronment.MagneticField magneticFieldModel;
-  Envioronment.Wind windModel;
-  Envioronment.Atmosphere atmosphereModel;
+  Environment.Gravity gravityModel;
+  Environment.MagneticField magneticFieldModel;
+  Environment.Wind windModel;
+  Environment.Atmosphere atmosphereModel;
   Interfaces.WorldBus world annotation(
     Placement(transformation(extent = {{90, -10}, {110, 10}})));
 equation

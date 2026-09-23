@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Interfaces;
+within FIRE_Modelica.Interfaces;
 
 expandable connector SensorBus
   Real x "World x position [m]";

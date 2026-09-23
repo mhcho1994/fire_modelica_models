@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Vehicles.FixedWing;
+within FIRE_Modelica.Vehicles.FixedWing;
 
 model SkywalkerX8
   extends FixedWingBase;
@@ -8,7 +8,7 @@ model SkywalkerX8
   parameter Real barometerSamplePeriod = 0.02;
   parameter Real gnssSamplePeriod = 0.2;
   parameter Real magnetometerSamplePeriod = 0.02;
-  parameter Real imuMountRoll = 180 * FIRE_CP_Modelica_Update.Utilities.Constants.d2r
+  parameter Real imuMountRoll = 180 * FIRE_Modelica.Utilities.Constants.d2r
     "IMU roll mounting angle from SITL SDF [rad]";
   parameter Real imuMountPitch = 0 "IMU pitch mounting angle [rad]";
   parameter Real imuMountYaw = 0 "IMU yaw mounting angle [rad]";
@@ -23,7 +23,7 @@ model SkywalkerX8
   Interfaces.SensorBus sensor annotation(
     Placement(transformation(extent = {{90, -10}, {110, 10}})));
 
-  Actuators.PwmActuator pwmActuator(
+  Adapters.Legacy.PwmCommandAdapter pwmActuator(
     nChannels = 3,
     pwmMin = {1100, 1100, 1000},
     pwmTrim = {1500, 1500, 1000},
@@ -31,14 +31,14 @@ model SkywalkerX8
     samplePeriod = actuatorSamplePeriod);
   FixedWingCommandMapper commandMapper(nChannels = 3);
   SkywalkerX8SITLPlant plant;
-  Sensors.Barometer.LowFidelity barometer(samplePeriod = barometerSamplePeriod);
-  Sensors.GNSS.LowFidelity gnss(samplePeriod = gnssSamplePeriod);
-  Sensors.IMU.LowFidelity imu(
+  Systems.Sensing.Barometer.LowFidelity barometer(samplePeriod = barometerSamplePeriod);
+  Systems.Sensing.GNSS.LowFidelity gnss(samplePeriod = gnssSamplePeriod);
+  Systems.Sensing.IMU.LowFidelity imu(
     samplePeriod = imuSamplePeriod,
     mountRoll = imuMountRoll,
     mountPitch = imuMountPitch,
     mountYaw = imuMountYaw);
-  Sensors.Magnetometer.LowFidelity magnetometer(
+  Systems.Sensing.Magnetometer.LowFidelity magnetometer(
     samplePeriod = magnetometerSamplePeriod,
     mountRoll = magnetometerMountRoll,
     mountPitch = magnetometerMountPitch,

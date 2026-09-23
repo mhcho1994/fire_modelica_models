@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Utilities.Math;
+within FIRE_Modelica.Utilities.Math;
 
 function quaternionConjugate
   input Real q[4] "Quaternion {w, x, y, z}";

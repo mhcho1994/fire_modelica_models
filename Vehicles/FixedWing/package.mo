@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Vehicles;
+within FIRE_Modelica.Vehicles;
 
 package FixedWing
 end FixedWing;

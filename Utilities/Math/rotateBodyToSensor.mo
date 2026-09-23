@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Utilities.Math;
+within FIRE_Modelica.Utilities.Math;
 
 function rotateBodyToSensor
   input Real vBody[3] "Vector resolved in body frame";

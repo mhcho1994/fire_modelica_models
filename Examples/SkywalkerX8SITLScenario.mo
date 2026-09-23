@@ -1,4 +1,4 @@
-within FIRE_CP_Modelica_Update.Examples;
+within FIRE_Modelica.Examples;
 
 model SkywalkerX8SITLScenario
   Worlds.World world;

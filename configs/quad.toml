@@ -1,0 +1,36 @@
+schema_version = 1
+model_name = "ConfiguredQuad"
+
+[geometry]
+preset = "QuadX"
+nLegs = 4
+nActuators = 4
+actuatorIndex = [1, 2, 3, 4]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, 1.0]
+q_start = [1.0, 0.0, 0.0, 0.0]
+
+[sensors]
+imuSamplePeriod = 0.0025
+magnetometerSamplePeriod = 0.02
+gnssSamplePeriod = 0.2
+barometerSamplePeriod = 0.02
+
+[ground]
+legStiffness = 1500.0
+legDamping = 25.0
+tangentialDamping = 10.0
+frictionCoefficient = 0.6

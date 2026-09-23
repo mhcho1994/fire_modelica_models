@@ -98,12 +98,12 @@ package RoverExample
       import RoverExample.Utils.quat2rot;
       import RoverExample.Utils.quat2eul;
       // parameters
-      parameter Real delta_max = 25.28*Constants.PI/180;        // [rad] max steering angle
-      parameter Real delta_turn = 3.28*Constants.PI/180;       // [rad] turn steering angle
+      parameter Real delta_max = 25.28*Constants.pi/180;        // [rad] max steering angle
+      parameter Real delta_turn = 3.28*Constants.pi/180;       // [rad] turn steering angle
       parameter Real v_fwd = 1.0;                               // [m/s] nominal forward velocity
       parameter Real v_max = 15.0;                              // [m/s] max forward velocity
       parameter Real sample_interval = 0.1;                     // [sec] sampling time
-      parameter Real turn_angle = 70*Constants.PI/180;                      // [rad] heading angle change for turn
+      parameter Real turn_angle = 70*Constants.pi/180;                      // [rad] heading angle change for turn
       // input, sensor
       Connectors.SensorBus sensor annotation(
         Placement(transformation(origin = {-108, -16}, extent = {{-8, -5}, {8, 5}}), iconTransformation(origin = {-132.8, -17.25}, extent = {{-29.2, -18.25}, {29.2, 18.25}})));
@@ -175,7 +175,7 @@ package RoverExample
         psi_filtered := euler_filtered[3];
     
         d := sqrt((x - x_ref)^2 + (y - y_ref)^2);
-        psi_change := mod(psi_filtered - psi_ref + Constants.PI, 2*Constants.PI) - Constants.PI;
+        psi_change := mod(psi_filtered - psi_ref + Constants.pi, 2*Constants.pi) - Constants.pi;
         
         if s==0 and turn < 0 then
           s := 1;
@@ -260,7 +260,7 @@ package RoverExample
       parameter Real W = 100;                                     // [W] power of speaker
       parameter Real dist = 0.01;                               // [m] distance to speaker
       parameter Real psi_ac = 80.0*Constants.d2r;               // [rad] speaker direction
-      parameter Real w_ac = 15.0002e+3*2*Constants.PI;          // [rad/s] acoustic attack frequency
+      parameter Real w_ac = 15.0002e+3*2*Constants.pi;          // [rad/s] acoustic attack frequency
       parameter Real epsilon = 0.0*Constants.d2r;               // [rad] misalignment of gyroscope, reference - 1deg
       parameter Real phi_0 = 30*Constants.d2r;                  // [rad] phase shift for acoustic noise compared to driving signal
       GyroAcousticAtk gyroatk(W=W, dist=dist, psi_ac=psi_ac, w_ac=w_ac, epsilon=epsilon, phi_0=phi_0);
@@ -342,7 +342,7 @@ package RoverExample
         az_meas = rover_3d.az-rover_3d.specific_g[3];
         phi_meas = rover_3d.phi;
         theta_meas = rover_3d.theta;
-        psi_meas = mod(rover_3d.psi + Constants.PI, 2*Constants.PI) - Constants.PI;
+        psi_meas = mod(rover_3d.psi + Constants.pi, 2*Constants.pi) - Constants.pi;
         p_meas = rover_3d.p;
         q_meas = rover_3d.q;
         r_meas = rover_3d.r+gyroatk.omega_yaw_false;
@@ -366,7 +366,7 @@ package RoverExample
         az_meas = 0-rover_8d.specific_g[3];
         phi_meas = rover_8d.phi_s;
         theta_meas = rover_8d.theta_s;
-        psi_meas = mod(rover_8d.psi_t + Constants.PI, 2*Constants.PI) - Constants.PI;
+        psi_meas = mod(rover_8d.psi_t + Constants.pi, 2*Constants.pi) - Constants.pi;
         p_meas = rover_8d.p_s;
         q_meas = rover_8d.q_s;
         r_meas = rover_8d.r_t+gyroatk.omega_yaw_false;
@@ -466,7 +466,7 @@ package RoverExample
       end when;
   
       // accelerometer specific force
-      C_n2b = transpose(eul2rot({phi, theta, mod(psi + Constants.PI, 2*Constants.PI) - Constants.PI}));
+      C_n2b = transpose(eul2rot({phi, theta, mod(psi + Constants.pi, 2*Constants.pi) - Constants.pi}));
       for i in 1:3 loop
         specific_g[i] = C_n2b[i,3]*Constants.g;
       end for;
@@ -550,8 +550,8 @@ package RoverExample
       parameter Real k_rad = 1.0*2*sqrt(2*mass_unsprung_front*k_ras);                 // [N*s/m] lateral damping rate at compliant pin joint between sprung and unsprung masses, cf. REF 5 page B-14
       parameter Real s_max = 0.999;               // [-] upper bound of slip ratio
       parameter Real s_min = -0.999;              // [-] lower bound of slip ratio
-      parameter Real alpha_max = Constants.PI/2;  // [rad] upper bound of slip angle
-      parameter Real alpha_min = -Constants.PI/2; // [rad] lower bound of slip angle
+      parameter Real alpha_max = Constants.pi/2;  // [rad] upper bound of slip angle
+      parameter Real alpha_min = -Constants.pi/2; // [rad] lower bound of slip angle
       parameter Real kappa_min = 0.0;             // [-] lower bound of non-dimensional tire force parameter
       parameter Real kappa_max = 10^4;            // [-] upper bound of non-dimensional tire force parameter
       
@@ -571,8 +571,8 @@ package RoverExample
       parameter Real b = 6.0e-04;                 // [N*m*s] viscous friction coefficient
       parameter Real gratio = 2.5;                // [-] gear ratio between motor shaft and wheel shafts
     
-      parameter Real delta_max = (28.28-3.00)/180*Constants.PI; // [rad] maximum angle of steering servo
-      parameter Real deltadot_max = 100/180*Constants.PI;           // [rad/s] maximum
+      parameter Real delta_max = (28.28-3.00)/180*Constants.pi; // [rad] maximum angle of steering servo
+      parameter Real deltadot_max = 100/180*Constants.pi;           // [rad/s] maximum
       parameter Real latitude = 40.42362443221589;    // [deg] latitude of the vehicle position in decimal degree
       parameter Real longitude = -86.92702983414662;                          // [deg] longitude of the vehicle position in decimal degree
        
@@ -689,14 +689,14 @@ package RoverExample
       
       der(Iq) = (Vq-R_phi*Iq-Kb_q*omega_m)/Le;
       der(lambda_m) = omega_m;
-      when lambda_m > 2*Constants.PI then
-        reinit(lambda_m,lambda_m-2*Constants.PI);
+      when lambda_m > 2*Constants.pi then
+        reinit(lambda_m,lambda_m-2*Constants.pi);
       end when;
       
       // compute shear stress
       T_motor = Kt_q * Iq;
       T_gear = T_motor *eta_mech * gratio;
-      tau_shaft = T_gear * 2 / Constants.PI / (r_shaft^3);
+      tau_shaft = T_gear * 2 / Constants.pi / (r_shaft^3);
       
       der(omega_m) = (T_motor-b*omega_m-torqueGain*((omega_m/gratio - omega_fl) + (omega_m/gratio - omega_fr) + (omega_m/gratio - omega_rl) + (omega_m/gratio - omega_rr)))/Jm;
 
@@ -910,7 +910,7 @@ package RoverExample
       Ploss = Iq^2*R_phi;
   
       // accelerometer specific force
-      C_n2b = transpose(eul2rot({phi_s, theta_s, mod(psi_t + Constants.PI, 2*Constants.PI) - Constants.PI}));
+      C_n2b = transpose(eul2rot({phi_s, theta_s, mod(psi_t + Constants.pi, 2*Constants.pi) - Constants.pi}));
       for i in 1:3 loop
         specific_g[i] = C_n2b[i,3]*Constants.g;
       end for;
@@ -957,7 +957,7 @@ package RoverExample
       parameter Real A;                             // [m^2] cross-sectional area of windings stator
       parameter Real B;                             // [T] magnetic flux density of stator
       parameter Real Nw;                            // [-] number of windings in each phase
-      constant Real nu0 = 4*Constants.PI*1e-7;      // [T*m/A] vacuum permeability
+      constant Real nu0 = 4*Constants.pi*1e-7;      // [T*m/A] vacuum permeability
       parameter Real mag_motor = B/nu0*(A*0.005);   // [A*m^2] magentic moment of permanent magent on rotor (interior-rotor, per-pole)
       parameter Real eta_motor = 0.05;              // [-] effectiveness of magnetic shielding (0: perfect shielding)
       parameter Real x_motor[3] = {0.03, 0.03, -0.05};  // [m] relative position from motor to magnetometer
@@ -973,8 +973,8 @@ package RoverExample
       Real b_wire[3](start={0, 0, 0},each fixed=false);  // [T] magnetic flux density
 equation
 // compute magnetic field intensity
-      b_motor = eta_motor*nu0/(4*Constants.PI)*(-(mag_motor+Nw*Iq*A)*{0,cos(lambda),sin(lambda)}/dist_motor^3+3*dot3((mag_motor+Nw*Iq*A)*{0,cos(lambda),sin(lambda)},x_motor)*x_motor/dist_motor^5);
-      b_wire = nu0*Iq/(2*Constants.PI)/dist_wire^2*cross3(wire_dir,x_wire);
+      b_motor = eta_motor*nu0/(4*Constants.pi)*(-(mag_motor+Nw*Iq*A)*{0,cos(lambda),sin(lambda)}/dist_motor^3+3*dot3((mag_motor+Nw*Iq*A)*{0,cos(lambda),sin(lambda)},x_motor)*x_motor/dist_motor^5);
+      b_wire = nu0*Iq/(2*Constants.pi)/dist_wire^2*cross3(wire_dir,x_wire);
     
     annotation(
         Icon(graphics = {Polygon(origin = {47, 8}, lineThickness = 1, points = {{-21, 20}, {-21, -12}, {-19, -16}, {-13, -20}, {-1, -20}, {13, -20}, {19, -16}, {21, -12}, {21, 20}, {11, 20}, {11, -10}, {9, -12}, {-9, -12}, {-11, -10}, {-11, 20}, {-21, 20}, {-21, 20}}), Rectangle(origin = {31, 24}, fillPattern = FillPattern.Solid, extent = {{-5, 4}, {5, -4}}), Rectangle(origin = {63, 24}, fillPattern = FillPattern.Solid, extent = {{-5, 4}, {5, -4}}), Text(origin = {46, -17}, extent = {{-36, 13}, {36, -13}}, textString = "3-axis Magnetometer"), Rectangle(origin = {-49, 1}, fillPattern = FillPattern.Solid, extent = {{-3, 61}, {3, -61}}), Ellipse(origin = {-48, 0}, lineThickness = 1, extent = {{-28, 6}, {28, -6}}), Ellipse(origin = {-48, 0}, lineThickness = 1, extent = {{-38, 12}, {38, -12}}), Ellipse(origin = {-48, 0}, lineThickness = 1, extent = {{-44, 18}, {44, -18}}), Polygon(origin = {-33, 46}, lineThickness = 1, points = {{-1, 10}, {-5, 6}, {-1, 6}, {-1, -10}, {1, -10}, {1, 6}, {5, 6}, {1, 10}, {1, 10}, {-1, 10}}), Text(origin = {-18, 45}, extent = {{-10, 7}, {10, -7}}, textString = "Current"), Polygon(origin = {-94, 2}, fillPattern = FillPattern.Solid, points = {{2, -2}, {-2, 0}, {2, -4}, {6, 0}, {2, -2}}), Polygon(origin = {-66, 4}, fillPattern = FillPattern.Solid, points = {{2, 4}, {-2, 0}, {2, -2}, {0, 0}, {2, 4}}), Polygon(origin = {-86, -4}, fillPattern = FillPattern.Solid, points = {{2, 0}, {-2, 0}, {4, -2}, {6, 2}, {2, 0}})}));
@@ -1005,7 +1005,7 @@ end EMIVulnerability;
       // compute magnetic field intensity
       C_n2b = transpose(eul2rot({phi, theta, psi}));
       for i in 1:3 loop
-        b_earth[i] = C_n2b[i,1]*(b_earth0*sin(Constants.PI/2-lat0))+C_n2b[i,3]*(-2*b_earth0*cos(Constants.PI/2-lat0));
+        b_earth[i] = C_n2b[i,1]*(b_earth0*sin(Constants.pi/2-lat0))+C_n2b[i,3]*(-2*b_earth0*cos(Constants.pi/2-lat0));
       end for;
 
     annotation(
@@ -1084,8 +1084,8 @@ end MadgwickFusionStep;
       // targeted acoustic attack model and parameters
       parameter Real m_d = 2.5e-9;                              // [kg] gyroscope driving mass
       parameter Real m_s = 4.1e-9;                              // [kg] gyroscope sensing mass
-      parameter Real w_d = 15e+3*2*Constants.PI;                // [rad/s] gyroscope driving frequency
-      parameter Real w_s = 23e+3*2*Constants.PI;                // [rad/s] gyroscope sensing natural frequency
+      parameter Real w_d = 15e+3*2*Constants.pi;                // [rad/s] gyroscope driving frequency
+      parameter Real w_s = 23e+3*2*Constants.pi;                // [rad/s] gyroscope sensing natural frequency
       parameter Real k_d = m_d*w_d^2;                           // [N/m] gyroscope driving spring coefficient
       parameter Real k_s = m_s*w_s^2;                           // [N/m] gyroscope sensing spring coefficient
       parameter Real zeta_d = 1/90;                             // [N/m] gyroscope driving damping coefficient (Q-factor: Qd = 45)
@@ -1095,12 +1095,12 @@ end MadgwickFusionStep;
       parameter Real W = 0;                                     // [W] power of speaker
       parameter Real dist = 0.01;                               // [m] distance to speaker
       parameter Real p0 = 20*10^(-6);                           // [pa] reference pressure
-      parameter Real SPL = 10*log10(avoidzero(W/4/Constants.PI/dist^2/(1.21)/(343)/p0^2));     // [pa] sound pressure level -> TO DO: Check 1.21 343 do not divide, multiply
+      parameter Real SPL = 10*log10(avoidzero(W/4/Constants.pi/dist^2/(1.21)/(343)/p0^2));     // [pa] sound pressure level -> TO DO: Check 1.21 343 do not divide, multiply
       parameter Real A = p0*10^(SPL/20)*(2*dis_d)^2;            // [N] acoustic force acting on gyro, suppose area = (2*driving displacement)*(2*driving displacement)
       parameter Real psi_ac = 80.0*Constants.d2r;               // [rad] speaker direction
       parameter Real A_x = A*cos(psi_ac);                       // [N] acoustic force on sensing axis, reference - suggested value 4.0e-9
       parameter Real A_y = A*sin(psi_ac);                       // [N] acoustic force on driving axis, reference - suggested value 16.0e-9
-      parameter Real w_ac = 15.0002e+3*2*Constants.PI;          // [rad/s] acoustic attack frequency
+      parameter Real w_ac = 15.0002e+3*2*Constants.pi;          // [rad/s] acoustic attack frequency
       parameter Real epsilon = 0.0*Constants.d2r;               // [rad] misalignment of gyroscope, reference - 1deg
       parameter Real phi_0 = 30*Constants.d2r;                  // [rad] phase shift for acoustic noise compared to driving signal
       parameter Real l_g = 1.0e-6;                              // [m] unit length scale
@@ -1212,11 +1212,11 @@ end GyroAcousticAtk;
   end Connectors;
 
   package Constants
-      constant Real PI = 3.14159265;
+      constant Real pi = 3.14159265;
       constant Real g = 9.80665;
       constant Real eps = 1.0e-15;
-      constant Real r2d = 180/PI;
-      constant Real d2r = PI/180;
+      constant Real r2d = 180/pi;
+      constant Real d2r = pi/180;
   
   end Constants;
 

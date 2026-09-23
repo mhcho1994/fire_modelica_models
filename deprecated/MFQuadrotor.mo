@@ -774,7 +774,7 @@ package GSQuad
       parameter Real psi_ac = 80.0*Constants.d2r;               // [rad] speaker direction
       parameter Real A_x = A*cos(psi_ac);                       // [N] acoustic force on sensing axis, reference - suggested value 4.0e-9
       parameter Real A_y = A*sin(psi_ac);                       // [N] acoustic force on driving axis, reference - suggested value 16.0e-9
-      parameter Real w_ac = 15.0002e+3*2*Constants.PI;          // [rad/s] acoustic attack frequency
+      parameter Real w_ac = 15.0002e+3*2*Constants.pi;          // [rad/s] acoustic attack frequency
       parameter Real epsilon = 0.0*Constants.d2r;               // [rad] misalignment of gyroscope, reference - 1deg
       parameter Real phi_0 = 30*Constants.d2r;                  // [rad] phase shift for acoustic noise compared to driving signal
       parameter Real l_g = 1.0e-6;                              // [m] unit length scale

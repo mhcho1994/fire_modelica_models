@@ -1,2 +1,10 @@
-R1RoverSITLScenario
 SkywalkerX8SITLScenario
+R1RoverSITLScenario
+QuadHover
+QuadImuOnly
+QuadImuResponse
+HexaHover
+OctoHover
+CoaxialHover
+QuadDrop
+FixedPayload

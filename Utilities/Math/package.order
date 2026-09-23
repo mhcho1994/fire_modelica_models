@@ -6,5 +6,7 @@ quaternionConjugate
 quaternionNormalize
 quaternionProduct
 quaternionToRotationMatrix
+quaternionRotationElement
 rotateVectorByQuaternion
 rotateBodyToSensor
+regularPolygon

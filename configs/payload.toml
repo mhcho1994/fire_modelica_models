@@ -1,0 +1,31 @@
+schema_version = 1
+model_name = "ConfiguredPayload"
+
+[geometry]
+preset = "QuadX"
+nLegs = 4
+
+[mass]
+mode = "assembled"
+[mass.core]
+componentId = "frame.core"
+mass = 1.2
+inertia = [[0.015, 0.0, 0.0], [0.0, 0.015, 0.0], [0.0, 0.0, 0.025]]
+[mass.arm]
+componentIds = ["arm.1", "arm.2", "arm.3", "arm.4"]
+mass = 0.05
+inertia = [[0.0001, 0.0, 0.0], [0.0, 0.0001, 0.0], [0.0, 0.0, 0.0002]]
+[[mass.payloads]]
+componentId = "payload.camera"
+mass = 0.3
+r_C = [0.06, 0.0, -0.08]
+inertia = [[0.0005, 0.0, 0.0], [0.0, 0.0007, 0.0], [0.0, 0.0, 0.0005]]
+
+[motor]
+omegaMax = 1100.0
+tau = 0.03
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, 1.0]

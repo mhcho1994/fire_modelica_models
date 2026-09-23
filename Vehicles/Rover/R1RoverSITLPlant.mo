@@ -1,8 +1,8 @@
-within FIRE_CP_Modelica_Update.Vehicles.Rover;
+within FIRE_Modelica.Vehicles.Rover;
 
 model R1RoverSITLPlant
-  import FIRE_CP_Modelica_Update.Utilities.Math.clip;
-  import FIRE_CP_Modelica_Update.Utilities.Math.wrapPi;
+  import FIRE_Modelica.Utilities.Math.clip;
+  import FIRE_Modelica.Utilities.Math.wrapPi;
 
   parameter Boolean skidSteering = false "Use skid-steering yaw mapping";
   parameter Boolean vectoredThrust = false "Use vectored-thrust yaw mapping";
@@ -11,11 +11,11 @@ model R1RoverSITLPlant
   parameter Real maxSpeed = if skidSteering then 4.0 else 8.0
     "Maximum forward speed [m/s]";
   parameter Real turningCircle = 1.8 "Nominal turn-circle diameter [m]";
-  parameter Real maxWheelTurn = 35 * FIRE_CP_Modelica_Update.Utilities.Constants.d2r
+  parameter Real maxWheelTurn = 35 * FIRE_Modelica.Utilities.Constants.d2r
     "Maximum steering wheel angle [rad]";
-  parameter Real skidTurnRate = 140 * FIRE_CP_Modelica_Update.Utilities.Constants.d2r
+  parameter Real skidTurnRate = 140 * FIRE_Modelica.Utilities.Constants.d2r
     "Skid-steer yaw rate at full steering [rad/s]";
-  parameter Real vectoredTurnRateMax = 120 * FIRE_CP_Modelica_Update.Utilities.Constants.d2r
+  parameter Real vectoredTurnRateMax = 120 * FIRE_Modelica.Utilities.Constants.d2r
     "Vectored-thrust yaw rate at full steering [rad/s]";
   parameter Real x_start = 0;
   parameter Real y_start = 0;
@@ -56,16 +56,16 @@ equation
   targetSpeed = throttleLimited * maxSpeed;
 
   turnDiameter =
-    if abs(steeringLimited) < FIRE_CP_Modelica_Update.Utilities.Constants.eps then 0
+    if abs(steeringLimited) < FIRE_Modelica.Utilities.Constants.eps then 0
     else turningCircle * sin(maxWheelTurn) / sin(steeringLimited * maxWheelTurn);
 
   yawRate =
     if skidSteering then steeringLimited * skidTurnRate
     elseif vectoredThrust then steeringLimited * vectoredTurnRateMax
-    elseif abs(steeringLimited) < FIRE_CP_Modelica_Update.Utilities.Constants.eps or abs(speed) < FIRE_CP_Modelica_Update.Utilities.Constants.eps then 0
-    else 2 * FIRE_CP_Modelica_Update.Utilities.Constants.PI * speed / (FIRE_CP_Modelica_Update.Utilities.Constants.PI * turnDiameter);
+    elseif abs(steeringLimited) < FIRE_Modelica.Utilities.Constants.eps or abs(speed) < FIRE_Modelica.Utilities.Constants.eps then 0
+    else 2 * FIRE_Modelica.Utilities.Constants.pi * speed / (FIRE_Modelica.Utilities.Constants.pi * turnDiameter);
 
-  longitudinalAccel = maxAccel * (targetSpeed - speed) / max(maxSpeed, FIRE_CP_Modelica_Update.Utilities.Constants.eps);
+  longitudinalAccel = maxAccel * (targetSpeed - speed) / max(maxSpeed, FIRE_Modelica.Utilities.Constants.eps);
   lateralAccel = yawRate * speed;
 
   der(psi) = yawRate;
@@ -76,7 +76,7 @@ equation
   position = {x, y, 0};
   velocityWorld = {speed * cos(psi), speed * sin(psi), 0};
   velocityBody = {speed, 0, 0};
-  accelerationBody = {longitudinalAccel, lateralAccel, -FIRE_CP_Modelica_Update.Utilities.Constants.g};
+  accelerationBody = {longitudinalAccel, lateralAccel, -FIRE_Modelica.Utilities.Constants.g};
   euler = {0, 0, wrapPi(psi)};
   rates = {0, 0, yawRate};
 end R1RoverSITLPlant;

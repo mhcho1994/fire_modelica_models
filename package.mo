@@ -1,3 +1,3 @@
-package FIRE_CP_Modelica_Update
+package FIRE_Modelica
   annotation(uses(Modelica(version = "4.0.0")));
-end FIRE_CP_Modelica_Update;
+end FIRE_Modelica;
