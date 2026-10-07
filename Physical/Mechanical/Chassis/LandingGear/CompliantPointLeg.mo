@@ -1,8 +1,8 @@
 within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
 
 model CompliantPointLeg "Fixed leg tip with unilateral spring-damper ground contact"
-  parameter Real rLeg_b[3](each unit = "m") = {0, 0, -0.1}
-    "Uncompressed tip offset from vehicle CG in body axes";
+  parameter Real rLeg_b[3](each unit = "m") = {0, 0, 0.1}
+    "Uncompressed tip offset from vehicle CG in body FRD axes";
   parameter Real stiffness(min = 0, unit = "N/m") = 3000;
   parameter Real damping(min = 0, unit = "N.s/m") = 150;
   parameter Real tangentialDamping(min = 0, unit = "N.s/m") = 25;

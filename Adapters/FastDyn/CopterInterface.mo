@@ -1,8 +1,6 @@
 within fire_modelica_models.Adapters.FastDyn;
 partial model CopterInterface "FastDyn FMI value contract; the composer supplies one plant"
   parameter Vehicles.Copter.Geometry geometry;
-  parameter Boolean sampledActuators = true;
-  parameter Real actuatorSamplePeriod = 0.0025;
   parameter Real pwm_min = 1100;
   parameter Real pwm_max = 1900;
   parameter Real lat0 = 40.414929;
@@ -21,15 +19,13 @@ partial model CopterInterface "FastDyn FMI value contract; the composer supplies
   output Real baro_temperature_c;
   output Real baro_climb_rate_mps;
   output Real rotorSpeed[geometry.nRotors];
-  output Interfaces.VehicleTruth truth;
-  PwmDemand commands(nChannels=geometry.nActuators, sampled=sampledActuators,
-    samplePeriod=actuatorSamplePeriod, pwmMin=fill(pwm_min,geometry.nActuators),
+  output Interfaces.VehicleState truth;
+  PwmDemand commands(nChannels=geometry.nActuators, pwmMin=fill(pwm_min,geometry.nActuators),
     pwmMax=fill(pwm_max,geometry.nActuators));
   SensorValues values(geometry=geometry);
 protected
   Real ambientPressure;
   Real ambientTemperature;
-  Real altitudeAbsolute;
 equation
   commands.pulseWidth_us=pwm;
   accel=values.acceleration_frd;
@@ -39,12 +35,11 @@ equation
   gps[2]=lon0+values.position_ned[2]/(earth_radius_m*cos(lat0*Modelica.Constants.pi/180))*180/Modelica.Constants.pi;
   gps[3]=ground_alt_wgs84-values.position_ned[3];
   vel_ned=values.velocity_ned;
-  yaw_deg=atan2(truth.R_wb[1,1],truth.R_wb[2,1])*180/Modelica.Constants.pi;
+  yaw_deg=atan2(truth.R_wb[2,1],truth.R_wb[1,1])*180/Modelica.Constants.pi;
   baro_altitude_m=values.measurements.altitude;
   baro_pressure_pa=values.measurements.pressure;
   baro_temperature_c=values.measurements.temperature-273.15;
   baro_climb_rate_mps=values.measurements.climbRate;
-  altitudeAbsolute=ground_alt_wgs84+truth.p_w[3];
-  ambientTemperature=288.15-0.0065*altitudeAbsolute;
-  ambientPressure=101325*(1-2.25577e-5*altitudeAbsolute)^5.25588;
+  ambientTemperature=288.15;
+  ambientPressure=101325;
 end CopterInterface;

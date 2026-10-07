@@ -16,9 +16,8 @@ pub struct ResolvedFireConfig {
     pub geometry: Table,
     pub mass: Table,
     pub motor: Table,
-    pub sensors: Table,
+    pub landing_gear: Table,
     pub initial: Table,
-    pub ground: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub models: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
@@ -196,7 +195,6 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
         raw,
         &[
             "preset",
-            "nLegs",
             "nActuators",
             "actuatorIndex",
             "armMount",
@@ -204,7 +202,6 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
             "rotorPosition_C",
             "R_br",
             "spinSign",
-            "legPosition_C",
         ],
         "geometry",
     )?;
@@ -219,22 +216,21 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
         "CoaxialX8" => (4, 8, 0.25),
         _ => return Err("geometry.preset must be QuadX, HexaX, OctoX, or CoaxialX8".into()),
     };
-    let nl = integer(g.get("nLegs").unwrap_or(&int(4)), "geometry.nLegs", 0)?;
     let nc = integer(
         g.get("nActuators").unwrap_or(&int(nr)),
         "geometry.nActuators",
         1,
     )?;
     // Bound source expansion; this is a tooling limit, not a physical model limit.
-    if nl > 4096 || nc > 4096 {
-        return Err("geometry: at most 4096 legs/actuator channels are supported".into());
+    if nc > 4096 {
+        return Err("geometry: at most 4096 actuator channels are supported".into());
     }
     let polygon = |n: usize, r: f64, z: f64, phase: f64| {
         Value::Array(
             (0..n)
                 .map(|i| {
                     let theta = 2. * std::f64::consts::PI * i as f64 / n as f64 + phase;
-                    vec3([r * theta.cos(), r * theta.sin(), z])
+                    vec3([r * theta.cos(), -r * theta.sin(), z])
                 })
                 .collect(),
         )
@@ -270,9 +266,9 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
                     let p = &mounts[arms[i].as_integer().unwrap() as usize - 1];
                     let dz = if preset == "CoaxialX8" {
                         if i < 4 {
-                            0.025
-                        } else {
                             -0.025
+                        } else {
+                            0.025
                         }
                     } else {
                         0.
@@ -311,24 +307,17 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
     {
         return Err("geometry.spinSign entries must be integers +1 or -1".into());
     }
-    let rotations = g
-        .get("R_br")
-        .cloned()
-        .unwrap_or_else(|| Value::Array(vec![mat(IDENTITY); nr]));
+    let rotations = g.get("R_br").cloned().unwrap_or_else(|| {
+        Value::Array(vec![mat([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]); nr])
+    });
     array(&rotations, &[nr, 3, 3], "geometry.R_br")?;
     for r in rotations.as_array().unwrap() {
         rotation(r, "geometry.R_br")?;
     }
-    let legs = g
-        .get("legPosition_C")
-        .cloned()
-        .unwrap_or_else(|| polygon(nl, 0.18, -0.15, std::f64::consts::PI / 4.));
-    array(&legs, &[nl, 3], "geometry.legPosition_C")?;
     array(&positions, &[nr, 3], "geometry.rotorPosition_C")?;
     let t = [
         ("nArms", int(na)),
         ("nRotors", int(nr)),
-        ("nLegs", int(nl)),
         ("nActuators", int(nc)),
         ("armMount", mounts),
         ("rotorArmIndex", arms),
@@ -336,7 +325,6 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
         ("rotorPosition_C", positions),
         ("R_br", rotations),
         ("spinSign", spins),
-        ("legPosition_C", legs),
     ]
     .into_iter()
     .map(|(k, v)| (k.into(), v))
@@ -451,28 +439,6 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
     Ok(out)
 }
 
-fn defaults(
-    raw: &Value,
-    fields: &[(&str, f64)],
-    label: &str,
-    strictly_positive: bool,
-) -> Result<Table> {
-    let allowed = fields.iter().map(|(k, _)| *k).collect::<Vec<_>>();
-    let t = table(raw, &allowed, label)?;
-    let mut out = Table::new();
-    for (k, default) in fields {
-        let v = t.get(*k).cloned().unwrap_or(Value::Float(*default));
-        number(
-            &v,
-            &format!("{label}.{k}"),
-            strictly_positive || *k == "legStiffness",
-            !strictly_positive,
-        )?;
-        out.insert((*k).into(), v);
-    }
-    Ok(out)
-}
-
 pub fn parse(source: &str) -> Result<ResolvedFireConfig> {
     parse_at(source, None)
 }
@@ -511,33 +477,38 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let version = root
         .get("schema_version")
         .and_then(Value::as_integer)
-        .ok_or("schema_version must be 1 or 2")?;
-    let mut allowed = vec![
+        .ok_or(
+            "schema_version must be 3 (NED/FRD continuous); migrate legacy ENU/FLU data explicitly",
+        )?;
+    let allowed = vec![
         "schema_version",
         "model_name",
         "geometry",
         "mass",
         "motor",
-        "sensors",
+        "landing_gear",
         "initial",
-        "ground",
+        "models",
+        "interface",
+        "acquisition",
     ];
-    if version == 2 {
-        allowed.extend(["models", "interface", "acquisition"]);
-    } else if version != 1 {
-        return Err("schema_version must be 1 or 2".into());
+    if version != 3 {
+        return Err(
+            "schema_version must be 3 (NED/FRD continuous); migrate legacy ENU/FLU data explicitly"
+                .into(),
+        );
     }
     table(&raw, &allowed, "config")?;
     let acquisition = root
         .get("acquisition")
         .and_then(Value::as_str)
-        .unwrap_or("sampled");
-    if !["sampled", "continuous"].contains(&acquisition)
+        .unwrap_or("continuous");
+    if acquisition != "continuous"
         || root
             .get("acquisition")
             .is_some_and(|v| v.as_str().is_none())
     {
-        return Err("acquisition must be sampled or continuous".into());
+        return Err("only continuous acquisition is supported; sampling is deprecated".into());
     }
     let name = root
         .get("model_name")
@@ -551,31 +522,10 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let m = mass(&section(root, "mass"), &g)?;
     let nr = g["nRotors"].as_integer().unwrap() as usize;
     let motor = resolve_motor(&section(root, "motor"), nr)?;
-    let sensors = defaults(
-        &section(root, "sensors"),
-        &[
-            ("imuSamplePeriod", 0.0025),
-            ("magnetometerSamplePeriod", 0.02),
-            ("gnssSamplePeriod", 0.2),
-            ("barometerSamplePeriod", 0.02),
-        ],
-        "sensors",
-        true,
-    )?;
-    let ground = defaults(
-        &section(root, "ground"),
-        &[
-            ("legStiffness", 1500.),
-            ("legDamping", 25.),
-            ("tangentialDamping", 10.),
-            ("frictionCoefficient", 0.6),
-        ],
-        "ground",
-        false,
-    )?;
+    let landing_gear = resolve_landing_gear(&section(root, "landing_gear"))?;
     let initial = resolve_initial(&section(root, "initial"))?;
     let models = resolve_models(&section(root, "models"))?;
-    let interface = resolve_interface(&section(root, "interface"), version)?;
+    let interface = resolve_interface(&section(root, "interface"))?;
     Ok(ResolvedFireConfig {
         schema_version: version,
         acquisition: acquisition.into(),
@@ -584,9 +534,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         geometry: g,
         mass: m,
         motor,
-        sensors,
+        landing_gear,
         initial,
-        ground,
         models,
         interface,
     })
@@ -630,6 +579,60 @@ fn resolve_motor(raw: &Value, n: usize) -> Result<Table> {
     Ok(out)
 }
 
+fn resolve_landing_gear(raw: &Value) -> Result<Table> {
+    let t = table(
+        raw,
+        &[
+            "enabled",
+            "position_C",
+            "groundZ",
+            "stiffness",
+            "damping",
+            "tangentialDamping",
+            "frictionCoefficient",
+        ],
+        "landing_gear",
+    )?;
+    let enabled = t.get("enabled").cloned().unwrap_or(Value::Boolean(true));
+    if !enabled.is_bool() {
+        return Err("landing_gear.enabled: expected boolean".into());
+    }
+    let positions = t.get("position_C").cloned().unwrap_or_else(|| {
+        Value::Array(
+            [
+                [0.17, 0.17, 0.1],
+                [-0.17, -0.17, 0.1],
+                [0.17, -0.17, 0.1],
+                [-0.17, 0.17, 0.1],
+            ]
+            .into_iter()
+            .map(vec3)
+            .collect(),
+        )
+    });
+    array(&positions, &[4, 3], "landing_gear.position_C")?;
+    let mut out = Table::new();
+    out.insert("enabled".into(), enabled);
+    out.insert("position_C".into(), positions);
+    for (key, default) in [
+        ("groundZ", 0.),
+        ("stiffness", 3000.),
+        ("damping", 150.),
+        ("tangentialDamping", 25.),
+        ("frictionCoefficient", 0.6),
+    ] {
+        let value = t.get(key).cloned().unwrap_or(Value::Float(default));
+        number(
+            &value,
+            &format!("landing_gear.{key}"),
+            false,
+            key != "groundZ",
+        )?;
+        out.insert(key.into(), value);
+    }
+    Ok(out)
+}
+
 fn resolve_initial(raw: &Value) -> Result<Table> {
     let t = table(
         raw,
@@ -638,9 +641,17 @@ fn resolve_initial(raw: &Value) -> Result<Table> {
     )?;
     let mut out = Table::new();
     for (k, default) in [
-        ("p_start", vec![0., 0., 1.]),
+        ("p_start", vec![0., 0., -1.]),
         ("v_start", vec![0.; 3]),
-        ("q_start", vec![1., 0., 0., 0.]),
+        (
+            "q_start",
+            vec![
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+            ],
+        ),
         ("omega_start", vec![0.; 3]),
     ] {
         let n = default.len();
@@ -675,74 +686,33 @@ fn resolve_models(raw: &Value) -> Result<Table> {
             return Err("models.rotor: supported model is speed_driven".into());
         }
     }
-    let mut out = t.clone();
-    for (k, n) in [
-        ("imu", 6),
-        ("magnetometer", 3),
-        ("gnss", 6),
-        ("barometer", 4),
-    ] {
-        if let Some(raw) = t.get(k) {
-            let v = table(raw, &["response", "tau"], &format!("models.{k}"))?;
-            let response = v
-                .get("response")
-                .and_then(Value::as_str)
-                .ok_or_else(|| format!("models.{k}.response is required"))?;
-            match response {
-                "ideal" if !v.contains_key("tau") => {}
-                "first_order" => {
-                    let tau = v
-                        .get("tau")
-                        .ok_or_else(|| format!("models.{k}.tau is required"))?;
-                    let tau = if tau.is_array() {
-                        tau.clone()
-                    } else {
-                        Value::Array(vec![tau.clone(); n])
-                    };
-                    array(&tau, &[n], &format!("models.{k}.tau"))?;
-                    for x in tau.as_array().unwrap() {
-                        number(x, "response tau", false, true)?;
-                    }
-                    out.get_mut(k)
-                        .unwrap()
-                        .as_table_mut()
-                        .unwrap()
-                        .insert("tau".into(), tau);
-                }
-                _ => {
-                    return Err(format!(
-                        "models.{k}: use ideal (without tau) or first_order"
-                    ))
-                }
+    for key in ["imu", "magnetometer", "gnss", "barometer"] {
+        if let Some(raw) = t.get(key) {
+            let v = table(raw, &["response"], &format!("models.{key}"))?;
+            if v.get("response").and_then(Value::as_str) != Some("ideal") {
+                return Err(format!(
+                    "models.{key}: only ideal response is supported; dynamics are deprecated"
+                ));
             }
         }
     }
-    Ok(out)
+    Ok(t.clone())
 }
 
-fn resolve_interface(raw: &Value, version: i64) -> Result<Table> {
+fn resolve_interface(raw: &Value) -> Result<Table> {
     let fields = [
         ("pwm_min", 1100.),
         ("pwm_max", 1900.),
-        ("actuatorSamplePeriod", 0.0025),
         ("lat0", 40.414929),
         ("lon0", -86.932387),
         ("ground_alt_wgs84", 149.),
         ("earth_radius_m", 6378137.),
     ];
     let t = table(raw, &fields.map(|(k, _)| k), "interface")?;
-    if version == 1 {
-        return Ok(Table::new());
-    }
     let mut out = Table::new();
     for (k, d) in fields {
         let v = t.get(k).cloned().unwrap_or(Value::Float(d));
-        number(
-            &v,
-            &format!("interface.{k}"),
-            ["actuatorSamplePeriod", "earth_radius_m"].contains(&k),
-            false,
-        )?;
+        number(&v, &format!("interface.{k}"), k == "earth_radius_m", false)?;
         out.insert(k.into(), v);
     }
     let get = |k| number(&out[k], k, false, false);

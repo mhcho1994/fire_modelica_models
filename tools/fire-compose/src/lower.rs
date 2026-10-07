@@ -26,14 +26,9 @@ fn record(class: &str, v: &toml::Value) -> Result<Value> {
     ))
 }
 fn geometry(c: &ResolvedFireConfig) -> Result<Value> {
-    let mut g = c.geometry.clone();
-    // {} has rank one. The record supplies its own [0,3] default.
-    if g["nLegs"].as_integer() == Some(0) {
-        g.remove("legPosition_C");
-    }
     Ok(Value::Record(
         "fire_modelica_models.Vehicles.Copter.Geometry".into(),
-        fields(&g)?,
+        fields(&c.geometry)?,
     ))
 }
 fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
@@ -103,9 +98,14 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
         };
         m.push(Modifier::Bind(name.into(), literal(v)?));
     }
-    for t in [&c.sensors, &c.initial, &c.ground] {
-        m.extend(fields(t)?);
-    }
+    m.extend(fields(&c.initial)?);
+    m.push(Modifier::Bind(
+        "landingGear".into(),
+        Value::Record(
+            "fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.Parameters".into(),
+            fields(&c.landing_gear)?,
+        ),
+    ));
     if c.models.contains_key("rotor") {
         m.push(Modifier::RedeclareModel {
             name: "RotorUnit".into(),
@@ -113,40 +113,12 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             modifiers: vec![],
         });
     }
-    let mut sensors = Vec::new();
-    for key in ["imu", "magnetometer", "gnss", "barometer"] {
-        if let Some(t) = c.models.get(key) {
-            let (class, mods) = if t["response"].as_str() == Some("first_order") {
-                (
-                    "FirstOrder",
-                    vec![Modifier::Bind("tau".into(), literal(&t["tau"])?)],
-                )
-            } else {
-                ("Ideal", vec![])
-            };
-            sensors.push(Modifier::Nested(
-                key.into(),
-                vec![Modifier::RedeclareModel {
-                    name: "Response".into(),
-                    class: format!("fire_modelica_models.Systems.Sensing.ResponseModels.{class}"),
-                    modifiers: mods,
-                }],
-            ));
-        }
-    }
-    if !sensors.is_empty() {
-        m.push(Modifier::Nested("sensors".into(), sensors));
-    }
     Ok(m)
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
     let plant_class = "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors";
     let mut modifiers = plant_modifiers(c)?;
-    modifiers.push(Modifier::Bind(
-        "sampledSensors".into(),
-        Value::Bool(c.acquisition == "sampled"),
-    ));
     match profile {
         "plant" => {
             modifiers.insert(0, Modifier::Bind("geometry".into(), geometry(c)?));
@@ -173,10 +145,6 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             );
             let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
             boundary.extend(fields(&c.interface)?);
-            boundary.push(Modifier::Bind(
-                "sampledActuators".into(),
-                Value::Bool(c.acquisition == "sampled"),
-            ));
             Ok(CompositionSpec {
                 name: c.model_name.clone(),
                 base: "fire_modelica_models.Adapters.FastDyn.CopterInterface".into(),

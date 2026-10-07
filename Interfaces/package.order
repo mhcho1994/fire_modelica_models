@@ -1,6 +1,2 @@
-PwmBus
-WorldBus
-SensorBus
-CommandBus
-VehicleTruth
+VehicleState
 SensorMeasurements

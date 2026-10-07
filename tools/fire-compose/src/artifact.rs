@@ -52,8 +52,15 @@ fn source_files(dir: &Path, root: &Path, files: &mut Vec<PathBuf>) -> Result<()>
             continue;
         }
         if path.is_dir() {
-            if !["build", "target", ".git", "__pycache__", "tools"]
-                .contains(&path.file_name().unwrap().to_string_lossy().as_ref())
+            if ![
+                "build",
+                "target",
+                ".git",
+                "__pycache__",
+                "tools",
+                "deprecated",
+            ]
+            .contains(&path.file_name().unwrap().to_string_lossy().as_ref())
             {
                 source_files(&path, root, files)?;
             }
@@ -129,14 +136,20 @@ pub fn emit(
         }
         previous = Some(prior);
     }
+    let ground_contact = config.landing_gear["enabled"].as_bool().unwrap();
     let mut manifest_value = json!({
-        "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":1,
+        "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":2,
+        "core_contract":"ned_frd_continuous_v1",
+        "frames":{"world":"NED","body":"FRD","chassis":"FRD","rotor":"local +z thrust","sensor":"local; v_b=R_bs*v_s"},
+        "physics":{"propulsion":"P0","rotor_aero":"R0","body":"rigid_6dof","drag":"none",
+                   "contact":if ground_contact { "four_point_spring_damper" } else { "none" },
+                   "sensors":"ideal_with_fixed_bias","acquisition":"continuous"},
         "schema_version":config.schema_version,"profile":profile,"model":config.model_name,
         "config_sha256":hash(raw.as_bytes()),"config":config,"source":source_identity(&root)?,
         "generated_model_sha256":hash(source.as_bytes()),
         "interface":{"nRotors":config.geometry["nRotors"],"nActuators":config.geometry["nActuators"],
                      "actuatorIndex":config.geometry["actuatorIndex"]},
-        "event_requirements":{"sampled_sensors":config.acquisition=="sampled","sampled_actuators":profile=="fastdyn" && config.acquisition=="sampled","ground_contact":config.geometry["nLegs"].as_integer().unwrap()>0},
+        "event_requirements":{"sampled_sensors":config.acquisition=="sampled","sampled_actuators":profile=="fastdyn" && config.acquisition=="sampled","ground_contact":ground_contact},
         "verification":{"configuration":"passed","modelica_check":"not_run","fmi_generation":"not_run","fmu_simulation":"not_run","firmware":"not_run"}
     });
     if let Some(prior) = previous {

@@ -1,7 +1,7 @@
 within fire_modelica_models.Tests;
 model MultirotorFrames "Nontrivial channel map, tilted rotor, shifted CG, hub torque exactly once"
   Vehicles.Copter.MultirotorPlant vehicle(
-    geometry(nArms=1,nRotors=2,nLegs=0,nActuators=3,
+    geometry(nArms=1,nRotors=2,nActuators=3,
       rotorArmIndex={1,1},actuatorIndex={3,1},spinSign={1,-1},
       rotorPosition_C=[0.2,0.1,0;-0.1,0.05,0.05],
       R_br={{{0,0,1},{0,1,0},{-1,0,0}},identity(3)}),

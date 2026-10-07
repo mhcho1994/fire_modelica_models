@@ -1,0 +1,23 @@
+schema_version = 1
+model_name = "ConfiguredHexa"
+
+[geometry]
+preset = "HexaX"
+nLegs = 3
+nActuators = 8
+actuatorIndex = [1, 2, 3, 4, 6, 8]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 2.2
+inertia = [[0.04, 0.002, 0.0], [0.002, 0.045, 0.0], [0.0, 0.0, 0.075]]
+
+[motor]
+omegaMax = [1000, 1000, 1000, 1000, 1000, 1000]
+tau = 0.035
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, 2.0]

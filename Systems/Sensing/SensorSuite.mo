@@ -1,16 +1,11 @@
 within fire_modelica_models.Systems.Sensing;
 
-model SensorSuite "Optional four-sensor assembly; each sensor owns its sampling and measurement behavior"
-  parameter Boolean sampled = true "Sample and hold, or continuous response outputs";
+model SensorSuite "Optional four-sensor assembly; continuous ideal measurements at rigid mounts"
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
   parameter Real R_bImu[3,3] = identity(3) "IMU frame to body";
   parameter Real R_bMag[3,3] = identity(3) "Magnetometer frame to body";
   parameter Real rGnss_b[3] = zeros(3) "Antenna displacement from total CG [m]";
   parameter Real rBarometer_b[3] = zeros(3) "Barometer displacement from total CG [m]";
-  parameter Real imuSamplePeriod = 0.0025;
-  parameter Real magnetometerSamplePeriod = 0.02;
-  parameter Real gnssSamplePeriod = 0.2;
-  parameter Real barometerSamplePeriod = 0.02;
   parameter Real accelBias[3] = zeros(3);
   parameter Real gyroBias[3] = zeros(3);
   parameter Real magBias[3] = zeros(3);
@@ -19,27 +14,23 @@ model SensorSuite "Optional four-sensor assembly; each sensor owns its sampling 
   parameter Real pressureBias = 0;
   parameter Real temperatureBias = 0;
   parameter Real altitudeBias = 0;
-  input Real p_w[3];
-  input Real v_w[3];
-  input Real R_wb[3,3];
-  input Real a_w[3];
-  input Real omega_b[3];
-  input Real alpha_b[3];
-  input Real gravity_w[3];
-  input Real magneticField_w[3];
-  input Real pressure "Ambient pressure supplied by the environment [Pa]";
-  input Real temperature "Ambient temperature supplied by the environment [K]";
+  input Real p_w[3](each unit="m");
+  input Real v_w[3](each unit="m/s");
+  input Real R_wb[3,3](each unit="1");
+  input Real a_w[3](each unit="m/s2");
+  input Real omega_b[3](each unit="rad/s");
+  input Real alpha_b[3](each unit="rad/s2");
+  input Real gravity_w[3](each unit="m/s2");
+  input Real magneticField_w[3](each unit="T");
+  input Real pressure(unit="Pa") "Ambient pressure supplied by the environment [Pa]";
+  input Real temperature(unit="K") "Ambient temperature supplied by the environment [K]";
   output fire_modelica_models.Interfaces.SensorMeasurements measurements;
 
-  IMU.Sensor imu(
-    sampled=sampled, samplePeriod=imuSamplePeriod, r_b=rImu_b, R_bs=R_bImu,
+  IMU.Sensor imu( r_b=rImu_b, R_bs=R_bImu,
     accelBias=accelBias, gyroBias=gyroBias);
-  Magnetometer.Sensor magnetometer(
-    sampled=sampled, samplePeriod=magnetometerSamplePeriod, R_bs=R_bMag, bias=magBias);
-  GNSS.Sensor gnss(
-    sampled=sampled, samplePeriod=gnssSamplePeriod, positionBias=positionBias, velocityBias=velocityBias);
-  Barometer.Sensor barometer(
-    sampled=sampled, samplePeriod=barometerSamplePeriod, pressureBias=pressureBias,
+  Magnetometer.Sensor magnetometer( R_bs=R_bMag, bias=magBias);
+  GNSS.Sensor gnss( positionBias=positionBias, velocityBias=velocityBias);
+  Barometer.Sensor barometer( pressureBias=pressureBias,
     temperatureBias=temperatureBias, altitudeBias=altitudeBias);
 protected
   Real barometerPosition_w[3];
@@ -58,8 +49,8 @@ equation
   barometerVelocity_w = v_w + R_wb * cross(omega_b, rBarometer_b);
   barometer.ambientPressure = pressure;
   barometer.ambientTemperature = temperature;
-  barometer.altitude_w = barometerPosition_w[3];
-  barometer.climbRate_w = barometerVelocity_w[3];
+  barometer.altitude_w = -barometerPosition_w[3];
+  barometer.climbRate_w = -barometerVelocity_w[3];
   measurements.acceleration = imu.acceleration;
   measurements.gyro = imu.gyro;
   measurements.magneticField = magnetometer.magneticField;
@@ -69,8 +60,4 @@ equation
   measurements.temperature = barometer.temperature;
   measurements.altitude = barometer.altitude;
   measurements.climbRate = barometer.climbRate;
-  measurements.imuSampleTime = imu.sampleTime;
-  measurements.magnetometerSampleTime = magnetometer.sampleTime;
-  measurements.gnssSampleTime = gnss.sampleTime;
-  measurements.barometerSampleTime = barometer.sampleTime;
 end SensorSuite;

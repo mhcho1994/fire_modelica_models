@@ -2,10 +2,10 @@ within fire_modelica_models.Physical.Mechanical.Dynamics;
 model RigidBody6DOF "Single rigid body; all applied moments are about its CG"
   parameter Modelica.Units.SI.Mass mass = 1;
   parameter Modelica.Units.SI.Inertia inertia[3, 3] = identity(3)
-    "Symmetric positive-definite inertia about CG, resolved in body FLU";
+    "Symmetric positive-definite inertia about CG, resolved in body FRD";
   parameter Modelica.Units.SI.Position p_start[3] = zeros(3);
   parameter Modelica.Units.SI.Velocity v_start[3] = zeros(3)
-    "Initial CG velocity resolved in body FLU";
+    "Initial CG velocity resolved in body FRD";
   parameter Real q_start[4] = {1, 0, 0, 0}
     "Initial Hamilton quaternion {w,x,y,z}, body to world; normalized at initialization";
   parameter Modelica.Units.SI.AngularVelocity omega_start[3] = zeros(3);
@@ -14,7 +14,7 @@ model RigidBody6DOF "Single rigid body; all applied moments are about its CG"
 
   input Modelica.Units.SI.Force force_b[3] "Sum of non-gravity forces in body";
   input Modelica.Units.SI.Torque moment_b[3] "Sum of moments about CG in body";
-  input Modelica.Units.SI.Acceleration gravity_w[3] "Gravity in world ENU";
+  input Modelica.Units.SI.Acceleration gravity_w[3] "Gravity in world NED";
 
   output Modelica.Units.SI.Position p_w[3](start = p_start, each fixed = true);
   output Modelica.Units.SI.Velocity v_b[3](start = v_start, each fixed = true);

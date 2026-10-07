@@ -2,8 +2,9 @@ within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
 
 model LandingGearAssembly "Independent contacts on an arbitrary number of legs"
   parameter Integer nLegs(min = 0) = 4;
-  parameter Real rLeg_b[nLegs, 3](each unit = "m") = zeros(nLegs, 3)
-    "Tip offsets from body CG; independent of rotor count";
+  parameter Real rLeg_b[nLegs, 3](each unit = "m") = fire_modelica_models.Utilities.Math.regularPolygon(
+      nLegs, sqrt(2)*0.17, 0.1, Modelica.Constants.pi/4)
+    "Tip offsets from body CG in FRD; independent of rotor count";
   parameter Real stiffness(min = 0, unit = "N/m") = 3000;
   parameter Real damping(min = 0, unit = "N.s/m") = 150;
   parameter Real tangentialDamping(min = 0, unit = "N.s/m") = 25;

@@ -1,9 +1,9 @@
-schema_version = 1
+# NED world / FRD chassis; continuous P0/R0 with four-point compliant landing gear.
+schema_version = 3
 model_name = "ConfiguredPayload"
 
 [geometry]
 preset = "QuadX"
-nLegs = 4
 
 [mass]
 mode = "assembled"
@@ -18,7 +18,7 @@ inertia = [[0.0001, 0.0, 0.0], [0.0, 0.0001, 0.0], [0.0, 0.0, 0.0002]]
 [[mass.payloads]]
 componentId = "payload.camera"
 mass = 0.3
-r_C = [0.06, 0.0, -0.08]
+r_C = [0.06, 0.0, 0.08]
 inertia = [[0.0005, 0.0, 0.0], [0.0, 0.0007, 0.0], [0.0, 0.0, 0.0005]]
 
 [motor]
@@ -28,4 +28,12 @@ kT = 0.00001
 kQ = 0.00000015
 
 [initial]
-p_start = [0.0, 0.0, 1.0]
+p_start = [0.0, 0.0, -1.0]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6

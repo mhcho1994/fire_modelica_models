@@ -5,5 +5,5 @@ model Gravity
     "Gravity magnitude [m/s2]";
   Modelica.Blocks.Interfaces.RealOutput gravity[3];
 equation
-  gravity = {0, 0, -g};
+  gravity = {0, 0, g};
 end Gravity;

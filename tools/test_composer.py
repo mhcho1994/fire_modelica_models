@@ -1,4 +1,4 @@
-"""Rust frontend parity and artifact behavior: python3 -m unittest discover -s tools -p test_composer.py."""
+"""Minimum NED/FRD frontend and artifact behavior: python3 -m unittest discover -s tools -p test_composer.py."""
 import json
 import hashlib
 import math
@@ -9,11 +9,6 @@ import subprocess
 import tempfile
 import unittest
 
-import generate_config as reference
-try:
-    import tomllib as tomli
-except ModuleNotFoundError:
-    import tomli
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / 'tools/fire-compose/target/debug/fire-compose'
@@ -46,19 +41,23 @@ class RustComposerTests(unittest.TestCase):
         else:
             self.assertEqual(a, b)
 
-    def test_schema_one_example_parity(self):
+    def test_minimal_examples_resolve_ned_frd(self):
         for source in sorted((ROOT / 'configs').glob('*.toml')):
             with self.subTest(source=source.name):
-                raw = source.read_text()
-                expected = reference.validate(tomli.loads(raw))
-                run = self.run_config(raw, 'validate', '--json')
+                run = self.run_config(source.read_text(), 'validate', '--json')
                 self.assertEqual(run.returncode, 0, run.stderr)
-                actual = json.loads(run.stdout)
-                actual.pop('acquisition')
-                self.assert_config_equal(expected, actual)
+                resolved = json.loads(run.stdout)
+                self.assertEqual(resolved['schema_version'], 3)
+                self.assertEqual(resolved['acquisition'], 'continuous')
+                self.assertLess(resolved['initial']['p_start'][2], 0)
+                self.assertEqual(resolved['geometry']['R_br'][0], [[1,0,0],[0,-1,0],[0,0,-1]])
+                self.assertLess(resolved['geometry']['armMount'][0][1], 0)
+                self.assertNotIn('nLegs', resolved['geometry'])
+                self.assertTrue(resolved['landing_gear']['enabled'])
+                self.assertEqual(len(resolved['landing_gear']['position_C']), 4)
 
     def test_nested_physics_table_matches_standalone_configuration(self):
-        standalone = ('schema_version=2\nmodel_name="NestedHexa"\nacquisition="continuous"\n'
+        standalone = ('schema_version=3\nmodel_name="NestedHexa"\nacquisition="continuous"\n'
                       '[geometry]\npreset="HexaX"\nnActuators=6\n')
         integrated = ('[Machine]\nplatform="STM32F427"\n'
                       '[FMU.models."hexa.variant".physics]\n'
@@ -79,7 +78,7 @@ class RustComposerTests(unittest.TestCase):
             self.assertEqual((Path(work) / 'integrated/NestedHexa.mo').read_bytes(), expected)
 
     def test_invalid_table_selection_does_not_emit(self):
-        valid = '[physics]\nschema_version=2\nmodel_name="SelectedQuad"\n'
+        valid = '[physics]\nschema_version=3\nmodel_name="SelectedQuad"\n'
         cases = [(valid, 'missing'), (valid, 'physics.schema_version'), (valid, ''),
                  (valid, 'physics]\n[other'),
                  (valid + 'unknown_field=1\n', 'physics'),
@@ -96,14 +95,27 @@ class RustComposerTests(unittest.TestCase):
     def test_invalid_configuration_does_not_emit(self):
         cases = [
             'schema_version=true',
-            'schema_version=2\nacquisition=false',
-            'schema_version=2\nacquisition="unknown"',
-            'schema_version=1\nmodel_name="Bad; end Bad"',
-            'schema_version=1\n[motor]\ntau=nan',
-            'schema_version=1\n[motor]\ntau=true',
-            'schema_version=1\n[geometry]\nactuatorIndex=[1,2,3,5]',
-            'schema_version=1\n[mass.aggregate]\ninertia=[[1,0,0],[0,1,0],[0,0,3]]',
-            'schema_version=2\n[models.imu]\nresponse="first_order"\ntau=[0.1,0.1]',
+            'schema_version=1',
+            'schema_version=2',
+            'schema_version=3\nacquisition="sampled"',
+            'schema_version=3\n[geometry]\nnLegs=0',
+            'schema_version=3\n[ground]\nlegStiffness=1500',
+            'schema_version=3\n[landing_gear]\nenabled=1',
+            'schema_version=3\n[landing_gear]\nstiffness=-1',
+            'schema_version=3\n[landing_gear]\ndamping=nan',
+            'schema_version=3\n[landing_gear]\ntangentialDamping=-1',
+            'schema_version=3\n[landing_gear]\nfrictionCoefficient=-1',
+            'schema_version=3\n[landing_gear]\ngroundZ=inf',
+            'schema_version=3\n[landing_gear]\nposition_C=[[0,0,0.1]]',
+            'schema_version=3\n[landing_gear]\nnLegs=6',
+            'schema_version=3\nacquisition=false',
+            'schema_version=3\nacquisition="unknown"',
+            'schema_version=3\nmodel_name="Bad; end Bad"',
+            'schema_version=3\n[motor]\ntau=nan',
+            'schema_version=3\n[motor]\ntau=true',
+            'schema_version=3\n[geometry]\nactuatorIndex=[1,2,3,5]',
+            'schema_version=3\n[mass.aggregate]\ninertia=[[1,0,0],[0,1,0],[0,0,3]]',
+            'schema_version=3\n[models.imu]\nresponse="first_order"\ntau=[0.1,0.1]',
         ]
         with tempfile.TemporaryDirectory() as work:
             output = Path(work) / 'generated'
@@ -114,18 +126,24 @@ class RustComposerTests(unittest.TestCase):
                     self.assertFalse(output.exists())
 
     def test_artifacts_contain_one_plant_and_track_acquisition(self):
-        raw = 'schema_version=2\nmodel_name="TestHexa"\nacquisition="continuous"\n[geometry]\npreset="HexaX"\nnActuators=8\nactuatorIndex=[1,2,3,4,6,8]\n'
+        raw = 'schema_version=3\nmodel_name="TestHexa"\nacquisition="continuous"\n[geometry]\npreset="HexaX"\nnActuators=8\nactuatorIndex=[1,2,3,4,6,8]\n'
         with tempfile.TemporaryDirectory() as work:
             output = Path(work) / 'generated'
             run = self.run_config(raw, 'emit', '--profile', 'fastdyn', '--output-dir', str(output))
             self.assertEqual(run.returncode, 0, run.stderr)
             source = (output / 'TestHexa.mo').read_text()
             self.assertEqual(source.count('MultirotorWithSensors plant('), 1)
-            self.assertIn('sampledSensors=false', source)
-            self.assertIn('sampledActuators=false', source)
+            self.assertNotIn('sampledSensors', source)
+            self.assertNotIn('sampledActuators', source)
             manifest = json.loads((output / 'TestHexa.manifest.json').read_text())
             self.assertEqual(manifest['interface']['nActuators'], 8)
-            self.assertFalse(manifest['event_requirements']['sampled_sensors'])
+            self.assertEqual(manifest['event_requirements'],
+                             {'ground_contact': True, 'sampled_actuators': False, 'sampled_sensors': False})
+            self.assertEqual(manifest['physics']['contact'], 'four_point_spring_damper')
+            self.assertEqual(manifest['core_contract'], 'ned_frd_continuous_v1')
+            self.assertEqual(manifest['frames']['body'], 'FRD')
+            self.assertFalse(any(k.startswith('deprecated/') for k in manifest['source']['files']))
+            self.assertFalse((output / 'sources/fire_modelica_models/deprecated').exists())
             self.assertEqual(manifest['verification']['fmu_simulation'], 'not_run')
             self.assertTrue((output / 'sources/fire_modelica_models/package.mo').is_file())
             manifest['verification']['modelica_check'] = 'test-result'
@@ -138,8 +156,56 @@ class RustComposerTests(unittest.TestCase):
             manifest = json.loads((output / 'TestHexa.manifest.json').read_text())
             self.assertEqual(manifest['verification']['modelica_check'], 'test-result')
 
+    def test_contact_can_be_disabled_explicitly(self):
+        raw = 'schema_version=3\nmodel_name="FreeVehicle"\n[landing_gear]\nenabled=false\n'
+        with tempfile.TemporaryDirectory() as work:
+            run = self.run_config(raw, 'emit', '--output-dir', work)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            manifest = json.loads((Path(work)/'FreeVehicle.manifest.json').read_text())
+            self.assertFalse(manifest['event_requirements']['ground_contact'])
+            self.assertEqual(manifest['physics']['contact'], 'none')
+            self.assertFalse(manifest['config']['landing_gear']['enabled'])
+
+    @unittest.skipUnless(os.environ.get("FIRE_TEST_OMC") == "1", "set FIRE_TEST_OMC=1")
+    def test_composed_ground_support_and_takeoff(self):
+        for preset, count in [('QuadX', 4), ('HexaX', 6)]:
+            with self.subTest(preset=preset), tempfile.TemporaryDirectory() as work:
+                work = Path(work)
+                raw = (f'schema_version=3\nmodel_name="GroundVehicle"\n[geometry]\npreset="{preset}"\n'
+                       '[landing_gear]\nenabled=true\ngroundZ=0.4\nstiffness=2400\ndamping=120\n'
+                       'position_C=[[0.17,0.17,0.15],[-0.17,-0.17,0.15],'
+                       '[0.17,-0.17,0.15],[-0.17,0.17,0.15]]\n'
+                       '[initial]\np_start=[0,0,0.23]\n')
+                run = self.run_config(raw, 'emit', '--profile', 'fastdyn', '--output-dir', str(work/'generated'))
+                self.assertEqual(run.returncode, 0, run.stderr)
+                thrust_pwm = 1100 + 800*math.sqrt(1.3*1.5*9.80665/(count*1e-5))/1000
+                harness = work/'GroundRun.mo'
+                harness.write_text(f'''model GroundRun
+  extends GroundVehicle(pwm=fill(if time<2 then 1100 else {thrust_pwm},{count}));
+equation
+  when time>=1.5 then
+    assert(abs(truth.p_w[3]-(0.4-0.15+1.5*9.80665/9600))<1e-6,"Composed ground height/compression failed");
+    assert(abs(accel[3]+9.80665)<1e-4,"Composed boot accelerometer must read -g");
+    assert(sum(if plant.gear.contact[i] then 1 else 0 for i in 1:4)==4,"Expected four supporting feet");
+  end when;
+  when time>=2.5 then
+    assert(abs(sum(plant.gear.normalForce))<1e-12 and truth.v_w[3]<0,"Composed vehicle must take off");
+  end when;
+end GroundRun;
+''')
+                files = [work/'generated/sources/fire_modelica_models/package.mo',work/'generated/GroundVehicle.mo',harness]
+                script = work/'simulate.mos'
+                script.write_text('loadModel(Modelica,{"4.0.0"});\n'+''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
+                    +'simulate(GroundRun,stopTime=2.6,tolerance=1e-8,outputFormat="csv");\ngetErrorString();\n')
+                run = subprocess.run(['omc',str(script)],cwd=work,text=True,capture_output=True,timeout=120)
+                self.assertIn('The simulation finished successfully',run.stdout,run.stdout+run.stderr)
+                with (work/'GroundRun_res.csv').open() as handle:
+                    last = list(csv.DictReader(handle))[-1]
+                self.assertAlmostEqual(float(last['time']),2.6)
+                self.assertLess(float(last['truth.p_w[3]']),0.2)
+
     def test_previous_namespace_outputs_can_be_regenerated(self):
-        raw = 'schema_version=1\nmodel_name="MigratedQuad"'
+        raw = 'schema_version=3\nmodel_name="MigratedQuad"'
         with tempfile.TemporaryDirectory() as work:
             output = Path(work)
             run = self.run_config(raw, 'emit', '--output-dir', work)
@@ -166,7 +232,7 @@ class RustComposerTests(unittest.TestCase):
             self.assertEqual(updated['verification']['modelica_check'], 'not_run')
 
     def test_previous_namespace_cleanup_preserves_unowned_and_symlink_trees(self):
-        raw = 'schema_version=1\nmodel_name="PreservedQuad"'
+        raw = 'schema_version=3\nmodel_name="PreservedQuad"'
         for symlink in (False, True):
             with self.subTest(symlink=symlink), tempfile.TemporaryDirectory() as work:
                 output = Path(work) / 'generated'
@@ -187,7 +253,7 @@ class RustComposerTests(unittest.TestCase):
                 self.assertEqual(old.is_symlink(), symlink)
 
     def test_user_source_and_symlink_outputs_are_preserved(self):
-        raw = 'schema_version=1\nmodel_name="KeepMe"'
+        raw = 'schema_version=3\nmodel_name="KeepMe"'
         with tempfile.TemporaryDirectory() as work:
             output = Path(work)
             source = output / 'KeepMe.mo'
@@ -204,36 +270,11 @@ class RustComposerTests(unittest.TestCase):
             self.assertEqual(target.read_text(), 'user-authored')
 
     @unittest.skipUnless(os.environ.get("FIRE_TEST_OMC") == "1", "set FIRE_TEST_OMC=1")
-    def test_continuous_and_sampled_acquisition_simulate(self):
-        with tempfile.TemporaryDirectory() as work:
-            work = Path(work)
-            raw = 'schema_version=2\nacquisition="continuous"\nmodel_name="CheckQuad"'
-            run = self.run_config(raw, 'emit', '--profile', 'fastdyn', '--output-dir', str(work/'generated'))
-            self.assertEqual(run.returncode, 0, run.stderr)
-            package = work/'generated/sources/fire_modelica_models/package.mo'
-            script = work/'check.mos'
-            script.write_text('loadModel(Modelica, {"4.0.0"});\nloadFile('+json.dumps(str(package))+');\n'
-                'simulate(fire_modelica_models.Tests.AcquisitionProfiles, stopTime=0.035, numberOfIntervals=70, outputFormat="csv");\ngetErrorString();\n')
-            run = subprocess.run(['omc', str(script)], cwd=work, text=True, capture_output=True, timeout=120)
-            self.assertEqual(run.returncode, 0, run.stdout+run.stderr)
-            result = work/'fire_modelica_models.Tests.AcquisitionProfiles_res.csv'
-            self.assertTrue(result.is_file(), run.stdout+run.stderr)
-            self.assertIn('The simulation finished successfully', run.stdout)
-            with result.open() as handle:
-                rows = list(csv.DictReader(handle))
-            last = rows[-1]
-            self.assertAlmostEqual(float(last['time']), 0.035)
-            self.assertAlmostEqual(float(last['sensors[1].measurements.position[1]']), 0.035)
-            self.assertAlmostEqual(float(last['sensors[2].measurements.position[1]']), 0.03)
-            self.assertAlmostEqual(float(last['commands[1].demand[6]']), 0.35)
-            self.assertAlmostEqual(float(last['commands[2].demand[6]']), 0.3)
-
-    @unittest.skipUnless(os.environ.get("FIRE_TEST_OMC") == "1", "set FIRE_TEST_OMC=1")
     def test_composed_quad_and_hexa_motor_response(self):
         for preset, count in [("QuadX",4),("HexaX",6)]:
             with self.subTest(preset=preset), tempfile.TemporaryDirectory() as work:
                 work = Path(work)
-                raw = f'schema_version=2\nacquisition="continuous"\nmodel_name="ComposedVehicle"\n[geometry]\npreset="{preset}"\n'
+                raw = f'schema_version=3\nacquisition="continuous"\nmodel_name="ComposedVehicle"\n[geometry]\npreset="{preset}"\n'
                 run = self.run_config(raw, 'emit', '--profile', 'fastdyn', '--output-dir', str(work/'generated'))
                 self.assertEqual(run.returncode, 0, run.stderr)
                 harness = work/'MotorRun.mo'
@@ -250,6 +291,8 @@ class RustComposerTests(unittest.TestCase):
                 expected = 500*(1-math.exp(-0.1/0.03))
                 for i in range(1,count+1):
                     self.assertAlmostEqual(float(last[f'rotorSpeed[{i}]']),expected,delta=1e-4)
-                self.assertAlmostEqual(float(last['values.measurements.imuSampleTime']),0.1)
+                self.assertAlmostEqual(float(last['yaw_deg']),90.0,delta=1e-6)
+                self.assertLess(float(last['accel[3]']),0)
+                self.assertAlmostEqual(float(last['baro_altitude_m']),-float(last['truth.p_w[3]']),delta=1e-8)
                 for key in ['gps[1]','gps[2]','gps[3]','accel[3]','baro_pressure_pa']:
                     self.assertTrue(math.isfinite(float(last[key])),key)

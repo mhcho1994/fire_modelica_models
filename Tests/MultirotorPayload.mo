@@ -1,5 +1,5 @@
 within fire_modelica_models.Tests;
-model MultirotorPayload "Fixed payload rebases all rotor, leg and sensor mounts"
+model MultirotorPayload "Fixed payload rebases all rotor and sensor mounts"
   Vehicles.Copter.MultirotorWithSensors vehicle(useAssembledMass=true,
     geometry(imuPosition_C={0.05,0,0},gnssPosition_C={0,0,0.1},barometerPosition_C={0,0,0.02}),
     core(mass=2,inertia=identity(3)),arms(each mass=0,each inertia=zeros(3,3)),
@@ -13,8 +13,9 @@ initial equation
   for i in 1:vehicle.geometry.nRotors loop
     assert(max(abs(vehicle.rotorPosition_b[i,:]-(vehicle.geometry.rotorPosition_C[i,:]-{0.1,0,-0.05})))<1e-12,"Rotor mount not rebased");
   end for;
-  for i in 1:vehicle.geometry.nLegs loop
-    assert(max(abs(vehicle.legPosition_b[i,:]-(vehicle.geometry.legPosition_C[i,:]-{0.1,0,-0.05})))<1e-12,"Leg mount not rebased");
+  for i in 1:4 loop
+    assert(max(abs(vehicle.legPosition_b[i,:]-(vehicle.landingGear.position_C[i,:]-{0.1,0,-0.05})))<1e-12,
+      "Landing leg mount must be rebased by the combined payload CG");
   end for;
   assert(max(abs(vehicle.sensors.rImu_b-{-0.05,0,0.05}))<1e-12,"IMU lever arm not rebased");
   assert(max(abs(vehicle.sensors.rGnss_b-{-0.1,0,0.15}))<1e-12,"GNSS mount not rebased");

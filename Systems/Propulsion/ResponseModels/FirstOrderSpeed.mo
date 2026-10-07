@@ -3,7 +3,7 @@ model FirstOrderSpeed "Load-independent first-order rotor speed response"
   parameter Modelica.Units.SI.Time tau = 0.02;
   parameter Modelica.Units.SI.AngularVelocity omegaMax = 1000;
   parameter Modelica.Units.SI.AngularVelocity omega_start = 0;
-  input Real demand "Normalized speed command";
+  input Real demand(unit="1") "Normalized speed command";
   output Modelica.Units.SI.AngularVelocity omega(start = omega_start, fixed = true);
 protected
   Modelica.Units.SI.AngularVelocity omegaCommand;
