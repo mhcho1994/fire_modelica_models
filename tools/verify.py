@@ -81,7 +81,6 @@ def run(omc, out):
         for name in ("quad", "hexa")
     }
     rejected = {
-        "DuplicateIds": "Duplicate physical mass componentId",
         "ImproperRotation": "right-handed rotation",
         "IndefiniteInertia": "physical mass distribution",
         "NonphysicalPrincipalMoments": "physical mass distribution",

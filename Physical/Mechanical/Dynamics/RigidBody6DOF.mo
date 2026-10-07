@@ -31,13 +31,29 @@ model RigidBody6DOF "Single rigid body; all applied moments are about its CG"
     "Display-only 3-2-1 angles {roll,pitch,yaw}; singular at pitch +/-pi/2";
 
 protected
-  final parameter Real q_start_norm = sqrt(q_start * q_start);
+  final parameter Real q_start_norm = sqrt(q_start[1] * q_start[1]
+    + q_start[2] * q_start[2] + q_start[3] * q_start[3] + q_start[4] * q_start[4]);
   final parameter Real q_initial[4] = q_start / max(q_start_norm, 1e-15);
   final parameter Real inertiaScale = max(abs(inertia));
   final parameter Real determinant =
     inertia[1, 1] * (inertia[2, 2] * inertia[3, 3] - inertia[2, 3] * inertia[3, 2])
     - inertia[1, 2] * (inertia[2, 1] * inertia[3, 3] - inertia[2, 3] * inertia[3, 1])
     + inertia[1, 3] * (inertia[2, 1] * inertia[3, 2] - inertia[2, 2] * inertia[3, 1]);
+  // Expand the 3x3 inverse in parameter arithmetic so explicit ODE exporters
+  // need neither an algebraic solver nor an external matrix-inverse function.
+  // Invalid inertia is rejected below; keep its parameter evaluation finite
+  // so the positive-definiteness assertion supplies the diagnostic.
+  final parameter Real inverseInertia[3, 3] = if determinant > 0 then
+    {{inertia[2, 2] * inertia[3, 3] - inertia[2, 3] * inertia[3, 2],
+     inertia[1, 3] * inertia[3, 2] - inertia[1, 2] * inertia[3, 3],
+     inertia[1, 2] * inertia[2, 3] - inertia[1, 3] * inertia[2, 2]},
+     {inertia[2, 3] * inertia[3, 1] - inertia[2, 1] * inertia[3, 3],
+     inertia[1, 1] * inertia[3, 3] - inertia[1, 3] * inertia[3, 1],
+     inertia[1, 3] * inertia[2, 1] - inertia[1, 1] * inertia[2, 3]},
+     {inertia[2, 1] * inertia[3, 2] - inertia[2, 2] * inertia[3, 1],
+     inertia[1, 2] * inertia[3, 1] - inertia[1, 1] * inertia[3, 2],
+     inertia[1, 1] * inertia[2, 2] - inertia[1, 2] * inertia[2, 1]}} / determinant
+    else zeros(3, 3);
 
 initial equation
   assert(mass > 0, "RigidBody6DOF requires positive mass");
@@ -60,7 +76,7 @@ equation
   a_w = R_wb * specificForce_b + gravity_w;
   der(p_w) = v_w;
   der(v_b) = specificForce_b + transpose(R_wb) * gravity_w - cross(omega_b, v_b);
-  inertia * alpha_b = moment_b - cross(omega_b, inertia * omega_b);
+  alpha_b = inverseInertia * (moment_b - cross(omega_b, inertia * omega_b));
   der(omega_b) = alpha_b;
   der(q_wb) = 0.5 * fire_modelica_models.Utilities.Math.quaternionProduct(
     q_wb, {0, omega_b[1], omega_b[2], omega_b[3]})

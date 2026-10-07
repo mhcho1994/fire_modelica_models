@@ -3,15 +3,15 @@ within fire_modelica_models.Tests;
 model ChassisMassProperties "Independent full-tensor mass composition and aggregate-mode checks"
   fire_modelica_models.Physical.Mechanical.Chassis.ChassisAssembly assembled(
     useAssembledMass = true,
-    core(mass = 2, r_C = {1, -2, 3}, inertia = diagonal({2, 3, 4}), componentId = "frame"),
+    core(mass = 2, r_C = {1, -2, 3}, inertia = diagonal({2, 3, 4})),
     nArms = 1,
     arms = {fire_modelica_models.Physical.Mechanical.Chassis.Arms.RigidArm(
-      mass = 1, r_C = {3, -1, 4}, componentId = "arm-1",
+      mass = 1, r_C = {3, -1, 4},
       R_Cj = [0, -1, 0; 1, 0, 0; 0, 0, 1],
       inertia = diagonal({0.1, 0.2, 0.3}))},
     nPayloads = 1,
     payloads = {fire_modelica_models.Physical.Mechanical.Chassis.Payloads.FixedPayload(
-      mass = 1, r_C = {-1, -3, 2}, componentId = "payload-1",
+      mass = 1, r_C = {-1, -3, 2},
       inertia = [0.4, 0.05, 0; 0.05, 0.5, 0; 0, 0, 0.6])});
   fire_modelica_models.Physical.Mechanical.Chassis.ChassisAssembly aggregateOnly(
     useAssembledMass = false,

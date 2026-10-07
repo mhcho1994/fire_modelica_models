@@ -24,6 +24,14 @@ The four landing contacts add their forces and CG moments to the same wrench sum
 Chassis mass assembly and massless compliant legs add no motion states. Aggregate and constituent
 mass budgets are mutually exclusive; physical parts must be counted once.
 
+`MassProperties` and its derived part records carry only `mass`, `r_C`, `R_Cj` and
+`inertia`. Part `componentId` strings belong to composer configuration and the manifest,
+not the numerical function interface. The composer rejects duplicate nonempty IDs in
+assembled budgets before emission; blank IDs leave bookkeeping to the caller. Direct
+Modelica constructors no longer accept `componentId`, so applications bypassing the
+composer must check part identity themselves. `combineMassProperties` retains the
+physical validity checks, rotations and parallel-axis calculation.
+
 The only differential states are rotor speeds and rigid-body position, body velocity,
 Hamilton quaternion and body angular velocity. Full inertia and quaternion dynamics
 remain part of the minimum rigid-body contract. Sensors add no states. Fixed bias

@@ -19,6 +19,14 @@ in `docs/architecture.md`; changing only the schema number is insufficient.
 `[models]` may select `rotor="speed_driven"` and `response="ideal"` for each sensor.
 Other response profiles, legacy `[ground]` / `geometry.nLegs` settings, sample periods
 and acquisition timestamps are deprecated. Static aggregate or assembled mass budgets remain supported.
+Mass `componentId` values (and arm `componentIds`) remain configuration metadata.
+The composer rejects duplicate nonempty IDs across the selected assembled parts before
+emission and preserves the resolved IDs in the manifest's `config.mass`. Empty IDs are
+allowed. Generated Modelica mass records contain only `mass`, `r_C`, `R_Cj` and `inertia`;
+ID changes alone do not change the numerical model. Direct Modelica constructors no
+longer accept `componentId`; callers bypassing the composer must ensure unique physical
+parts themselves. Numerical mass/inertia validation remains in Modelica.
+
 `[landing_gear]` accepts `enabled` (default true), `position_C` (exactly 4x3, FRD
 relative to chassis C), `groundZ` (NED), `stiffness`, `damping`, `tangentialDamping`,
 and `frictionCoefficient`. Coefficients are finite and nonnegative. Positions are

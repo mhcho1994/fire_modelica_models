@@ -24,5 +24,5 @@ model ChassisAssembly "Select an aggregate budget or assemble rigid component ma
     "Combined inertia about cg_C, resolved in chassis/body axes";
 initial equation
   assert(mass > 0, "The selected chassis mass budget must have positive total mass");
-  annotation(Documentation(info = "<html><p>All parts are fixed to chassis axes C. Subtract cg_C from every rotor and sensor mount position before passing it to the rigid body assembly. This model has no motion states and applies no gravity. Add every physical part exactly once; aggregate mode never adds the constituent records. Duplicate nonempty componentId values in the selected budget are rejected. Blank IDs are allowed for simple constructors, and leave duplicate-part bookkeeping to the caller.</p></html>"));
+  annotation(Documentation(info = "<html><p>All parts are fixed to chassis axes C. Subtract cg_C from every rotor and sensor mount position before passing it to the rigid body assembly. This model has no motion states and applies no gravity. Add every physical part exactly once; aggregate mode never adds the constituent records. fire-compose checks duplicate nonempty componentId values in the configuration before emission and preserves them in the manifest. Direct Modelica callers own duplicate-part bookkeeping.</p></html>"));
 end ChassisAssembly;

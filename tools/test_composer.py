@@ -166,6 +166,84 @@ class RustComposerTests(unittest.TestCase):
             self.assertEqual(manifest['physics']['contact'], 'none')
             self.assertFalse(manifest['config']['landing_gear']['enabled'])
 
+    def test_mass_ids_stay_in_manifest_and_do_not_change_physics_source(self):
+        aggregate = (ROOT / 'configs/quad.toml').read_text().replace(
+            '[mass.aggregate]', '[mass.aggregate]\ncomponentId="vehicle.aggregate"')
+        assembled = (ROOT / 'configs/payload.toml').read_text() + (
+            '\n[[mass.additional_parts]]\ncomponentId="battery"\nmass=0.1\n'
+            'inertia=[[0.001,0,0],[0,0.001,0],[0,0,0.001]]\n')
+        for raw, model, expected in [
+            (aggregate, 'ConfiguredQuad', ['vehicle.aggregate']),
+            (assembled, 'ConfiguredPayload',
+             ['frame.core', 'arm.1', 'arm.2', 'arm.3', 'arm.4', 'payload.camera', 'battery']),
+        ]:
+            for profile in ('plant', 'fastdyn'):
+                with self.subTest(model=model, profile=profile), tempfile.TemporaryDirectory() as work:
+                    output = Path(work)
+                    run = self.run_config(raw, 'emit', '--profile', profile, '--output-dir', work)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    source = (output / f'{model}.mo').read_text()
+                    self.assertNotIn('componentId', source)
+                    manifest = json.loads((output / f'{model}.manifest.json').read_text())
+                    mass = manifest['config']['mass']
+                    parts = ([mass['aggregate']] if mass['mode'] == 'aggregate' else
+                             [mass['core'], *mass['arms'], *mass['payloads'], *mass['additional_parts']])
+                    self.assertEqual([p['componentId'] for p in parts], expected)
+                    renamed = raw
+                    for identity in expected:
+                        renamed = renamed.replace(f'"{identity}"', f'"renamed.{identity}"')
+                    run = self.run_config(renamed, 'emit', '--profile', profile, '--output-dir', work)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    self.assertEqual((output / f'{model}.mo').read_text(), source)
+                    updated = json.loads((output / f'{model}.manifest.json').read_text())
+                    self.assertNotEqual(updated['config_sha256'], manifest['config_sha256'])
+
+    def test_duplicate_mass_ids_are_rejected_before_emission(self):
+        raw = (ROOT / 'configs/payload.toml').read_text()
+        duplicates = [
+            raw.replace('"payload.camera"', '"frame.core"'),
+            raw.replace('"arm.2"', '"arm.1"'),
+            raw.replace('"frame.core"', '"arm.1"'),
+            raw + ('\n[[mass.additional_parts]]\ncomponentId="payload.camera"\nmass=0.1\n'
+                   'inertia=[[0.001,0,0],[0,0.001,0],[0,0,0.001]]\n'),
+        ]
+        for index, duplicate in enumerate(duplicates):
+            with self.subTest(collision=index), tempfile.TemporaryDirectory() as work:
+                output = Path(work) / 'generated'
+                run = self.run_config(duplicate, 'emit', '--output-dir', str(output))
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn('duplicate nonempty componentId', run.stderr)
+                self.assertFalse(output.exists())
+        for identity in ['frame.core', 'arm.1', 'arm.2', 'arm.3', 'arm.4', 'payload.camera']:
+            raw = raw.replace(f'"{identity}"', '""')
+        run = self.run_config(raw, 'validate')
+        self.assertEqual(run.returncode, 0, run.stderr)
+
+    @unittest.skipUnless(os.environ.get("FIRE_TEST_OMC") == "1", "set FIRE_TEST_OMC=1")
+    def test_composed_assembled_mass_preserves_mass_and_cg(self):
+        raw = (ROOT / 'configs/payload.toml').read_text()
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            run = self.run_config(raw, 'emit', '--profile', 'fastdyn', '--output-dir', str(work/'generated'))
+            self.assertEqual(run.returncode, 0, run.stderr)
+            harness = work/'MassRun.mo'
+            harness.write_text('''model MassRun
+  extends ConfiguredPayload(pwm=fill(1100,4));
+initial equation
+  assert(abs(plant.chassis.mass-1.7)<1e-12,"Composed assembled mass changed");
+  assert(max(abs(plant.chassis.cg_C-{0.018/1.7,0,0.024/1.7}))<1e-12,
+    "Composed assembled CG changed");
+end MassRun;
+''')
+            files = [work/'generated/sources/fire_modelica_models/package.mo',
+                     work/'generated/ConfiguredPayload.mo', harness]
+            script = work/'simulate.mos'
+            script.write_text('loadModel(Modelica,{"4.0.0"});\n'
+                + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
+                + 'simulate(MassRun,stopTime=0.01);\ngetErrorString();\n')
+            run = subprocess.run(['omc',str(script)],cwd=work,text=True,capture_output=True,timeout=120)
+            self.assertIn('The simulation finished successfully',run.stdout,run.stdout+run.stderr)
+
     @unittest.skipUnless(os.environ.get("FIRE_TEST_OMC") == "1", "set FIRE_TEST_OMC=1")
     def test_composed_ground_support_and_takeoff(self):
         for preset, count in [('QuadX', 4), ('HexaX', 6)]:

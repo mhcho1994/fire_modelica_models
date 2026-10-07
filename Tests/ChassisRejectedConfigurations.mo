@@ -1,16 +1,7 @@
 within fire_modelica_models.Tests;
 
 package ChassisRejectedConfigurations "Negative fixtures: each nested model must fail validation"
-  model DuplicateIds "Expected error: Duplicate physical mass componentId"
-    fire_modelica_models.Physical.Mechanical.Chassis.ChassisAssembly chassis(
-      useAssembledMass = true,
-      core(componentId = "same-physical-part"),
-      nPayloads = 1,
-      payloads = {fire_modelica_models.Physical.Mechanical.Chassis.Payloads.FixedPayload(
-        mass = 0.3, componentId = "same-physical-part")});
-    output Real totalMass = chassis.mass;
-  end DuplicateIds;
-
+  // Duplicate component IDs are rejected by fire-compose; see tools/test_composer.py.
   model ImproperRotation "Expected error: Part inertia axes must be a right-handed rotation"
     fire_modelica_models.Physical.Mechanical.Chassis.ChassisAssembly chassis(
       useAssembledMass = true, core(R_Cj = diagonal({1, 1, -1})));

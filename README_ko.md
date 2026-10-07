@@ -17,6 +17,12 @@ world NED / chassis·body FRD가 기본입니다.
 `landingGear(enabled=false)`를 지정하면 지면을 통과하는 자유낙하 모델이 됩니다.
 일반 지형·항력·전기 motor/ESC·배터리·프로토콜 모델은 활성 경로에 없습니다.
 
+질량 record에는 `mass`, `r_C`, `R_Cj`, `inertia`만 포함합니다. 부품 `componentId`는
+TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 않은 ID의 중복을 검사합니다.
+직접 작성하는 Modelica의 `MassProperties(...)` 및 파생 record 생성자에서는 `componentId`
+수정자를 제거해야 합니다. Composer를 거치지 않는 경우 부품 중복 계상은 호출자가 확인해야 하며,
+질량·회전행렬·관성의 물리적 유효성 검사는 기존 Modelica 함수에서 계속 수행합니다.
+
 ## 실행
 
 ```sh

@@ -19,11 +19,16 @@ fn fields(t: &Map<String, toml::Value>) -> Result<Vec<Modifier>> {
         .map(|(k, v)| Ok(Modifier::Bind(k.clone(), literal(v)?)))
         .collect()
 }
-fn record(class: &str, v: &toml::Value) -> Result<Value> {
-    Ok(Value::Record(
-        class.into(),
-        fields(v.as_table().ok_or("expected record fields")?)?,
-    ))
+fn mass_record(class: &str, v: &toml::Value) -> Result<Value> {
+    // Part identities are validated configuration/manifest metadata, not physics inputs.
+    let modifiers = v
+        .as_table()
+        .ok_or("expected mass record fields")?
+        .iter()
+        .filter(|(name, _)| name.as_str() != "componentId")
+        .map(|(name, value)| Ok(Modifier::Bind(name.clone(), literal(value)?)))
+        .collect::<Result<_>>()?;
+    Ok(Value::Record(class.into(), modifiers))
 }
 fn geometry(c: &ResolvedFireConfig) -> Result<Value> {
     Ok(Value::Record(
@@ -40,7 +45,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
     if assembled {
         m.push(Modifier::Bind(
             "core".into(),
-            record(
+            mass_record(
                 "fire_modelica_models.Physical.Mechanical.Chassis.CenterBody.RigidCenterBody",
                 &c.mass["core"],
             )?,
@@ -75,7 +80,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
                     Value::Array(
                         parts
                             .iter()
-                            .map(|p| record(class, p))
+                            .map(|p| mass_record(class, p))
                             .collect::<Result<_>>()?,
                     ),
                 ));
@@ -84,7 +89,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
     } else {
         m.push(Modifier::Bind(
             "aggregate".into(),
-            record(
+            mass_record(
                 "fire_modelica_models.Physical.Mechanical.MassProperties",
                 &c.mass["aggregate"],
             )?,

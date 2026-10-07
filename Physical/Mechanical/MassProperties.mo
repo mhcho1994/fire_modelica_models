@@ -8,7 +8,5 @@ record MassProperties "A physical part's mass and inertia about its own centre o
     "Rotation from the part's inertia axes j to chassis axes C";
   Real inertia[3, 3](each unit = "kg.m2") = zeros(3, 3)
     "Inertia about the part centre of mass, resolved in axes j";
-  String componentId = ""
-    "Optional physical-part identity; nonempty IDs must be unique within a mass budget";
-  annotation(Documentation(info = "<html><p>Use a stable, unique componentId when the same physical part is referenced by several subsystems. The chassis rejects duplicate nonempty IDs. A blank ID preserves compatibility with simple parameter constructors, but the caller remains responsible for including that physical mass only once.</p></html>"));
+  annotation(Documentation(info = "<html><p>This record contains only numerical mass properties. Physical-part componentId metadata belongs to the composer configuration and manifest; fire-compose rejects duplicate nonempty IDs before generating Modelica. Direct Modelica callers must account for each physical part exactly once.</p></html>"));
 end MassProperties;

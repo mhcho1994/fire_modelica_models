@@ -17,16 +17,9 @@ algorithm
   combined.r_C := zeros(3);
   combined.R_Cj := identity(3);
   combined.inertia := zeros(3, 3);
-  combined.componentId := "";
 
   for i in 1:size(parts, 1) loop
     assert(parts[i].mass >= 0, "Part mass must be nonnegative");
-    if parts[i].componentId <> "" then
-      for previous in 1:(i - 1) loop
-        assert(parts[previous].componentId <> parts[i].componentId,
-          "Duplicate physical mass componentId: " + parts[i].componentId);
-      end for;
-    end if;
     inertiaScale := max(abs(parts[i].inertia));
     assert(parts[i].mass > 0 or inertiaScale == 0,
       "A zero-mass part cannot carry nonzero mass inertia");

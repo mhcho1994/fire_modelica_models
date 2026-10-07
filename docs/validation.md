@@ -35,6 +35,12 @@ Generated quad/hexa tests also exercise custom foot positions, ground height and
 coefficients, grounded accelerometer outputs and takeoff. Invalid landing-gear shapes,
 negative/nonfinite coefficients and nonboolean enable flags are rejected before emission.
 Set FIRE_TEST_OMC=1 to include these generated-model simulations.
+Mass metadata tests reject duplicate nonempty IDs across core, arms, payloads and
+additional parts before emission, allow blank IDs, and verify that IDs remain in the
+manifest without affecting generated Modelica. The generated assembled-payload test
+checks mass and CG; `ChassisMassProperties` checks the full rotated inertia tensor.
+Duplicate IDs are tested in the composer rather than `ChassisRejectedConfigurations`,
+whose remaining negative cases cover physical validity in Modelica.
 
 `probe_export.py` builds quad/hexa FMI 2.0 CS artifacts, initializes real FMU instances,
 sets all channels, calls doStep/getReal and checks freefall, independent motor response,
