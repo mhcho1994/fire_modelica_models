@@ -3,8 +3,9 @@ within fire_modelica_models.Physical.Mechanical.Chassis;
 model ChassisAssembly "Select an aggregate budget or assemble rigid component mass properties"
   parameter Boolean useAssembledMass = false
     "False uses aggregate exclusively; true uses constituents exclusively";
-  parameter fire_modelica_models.Physical.Mechanical.MassProperties aggregate(
-    mass = 1, inertia = diagonal({0.01, 0.01, 0.01}));
+  parameter fire_modelica_models.Physical.Mechanical.MassProperties aggregate =
+    fire_modelica_models.Physical.Mechanical.MassProperties(
+      mass = 1, inertia = diagonal({0.01, 0.01, 0.01}));
   parameter CenterBody.RigidCenterBody core;
   parameter Integer nArms(min = 0) = 0;
   parameter Arms.RigidArm arms[nArms];

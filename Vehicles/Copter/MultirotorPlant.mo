@@ -3,7 +3,8 @@ model MultirotorPlant "N-rotor rigid vehicle, continuous P0/R0, NED/FRD, optiona
   parameter Vehicles.Copter.Geometry geometry;
   parameter Physical.Mechanical.Chassis.LandingGear.Parameters landingGear;
   parameter Boolean useAssembledMass = false;
-  parameter Physical.Mechanical.MassProperties aggregate(mass=1.5,inertia=diagonal({0.02,0.02,0.04}));
+  parameter Physical.Mechanical.MassProperties aggregate =
+    Physical.Mechanical.MassProperties(mass=1.5,inertia=diagonal({0.02,0.02,0.04}));
   parameter Physical.Mechanical.Chassis.CenterBody.RigidCenterBody core(mass=1.2,inertia=diagonal({0.015,0.015,0.025}));
   parameter Physical.Mechanical.Chassis.Arms.RigidArm arms[geometry.nArms](
     each mass=0.05,r_C=geometry.armMount/2,each inertia=diagonal({0.0001,0.0001,0.0002}));
