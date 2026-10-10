@@ -5,7 +5,8 @@ model_name = "ConfiguredQuad"
 [geometry]
 preset = "QuadX"
 nActuators = 4
-actuatorIndex = [1, 2, 3, 4]
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
 
 [mass]
 mode = "aggregate"
