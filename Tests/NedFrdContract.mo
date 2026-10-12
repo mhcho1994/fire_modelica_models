@@ -15,7 +15,7 @@ model NedFrdContract "Same physical motion in old ENU/FLU and new NED/FRD bases"
   Systems.Sensing.IMU.Sensor oldImu(r_b=rOld,R_bs=mountOld);
   Systems.Sensing.SensorSuite sensors(rImu_b=B*rOld,R_bImu=B*mountOld,R_bMag=B*mountOld,
     rGnss_b=B*rOld,rBarometer_b=B*rOld);
-  Adapters.FastDyn.SensorValues values(geometry(R_bImu=B*mountOld,R_bMag=B*mountOld));
+  Adapters.VirtualIO.SensorValues values(geometry(R_bImu=B*mountOld,R_bMag=B*mountOld));
   Real antennaOld[3];
   Real rotorForceOld[3];
   Real rotorMomentOld[3];

@@ -1,0 +1,42 @@
+# NED world / FRD chassis; continuous P1/R0 with four-point compliant landing gear.
+schema_version = 3
+model_name = "ConfiguredHexaP1"
+
+[geometry]
+preset = "HexaX"
+nActuators = 8
+actuatorIndex = [1, 2, 3, 4, 6, 8]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 2.2
+inertia = [[0.04, -0.002, 0.0], [-0.002, 0.045, 0.0], [0.0, 0.0, 0.075]]
+
+[motor]
+Kv = [62.5, 62.5, 62.5, 62.5, 62.5, 62.5] # (rad/s)/V
+tauOmega = 0.035
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12] # Feet start 2 cm above the ground.
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+rotor = "voltage_driven"
+
+[power]
+dcVoltage = 16.0 # Ideal fixed supply; no battery current/SOC model.
+
+# Shared VirtualIO PWM calibration for both P0 and P1.
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0

@@ -1,13 +1,13 @@
 # Minimum continuous multicopter architecture
 
-This implementation follows MULTICOPTER_INTERFACES v0.7 when the older port-contract
+This implementation follows MULTICOPTER_INTERFACES v0.8 when the older port-contract
 summary is ambiguous about frames. Active core contract: `ned_frd_continuous_v1`.
-Contract IDs describe physical boundaries; profiles P0/R0 describe approximations.
+Contract IDs describe physical boundaries; profiles P0/P1 and R0 describe approximations.
 
 ## Composition and ownership
 
 ```text
-PWM values -> PwmDemand -> demand[N] -> FirstOrderSpeed -> QuadraticBlade
+PWM values -> VirtualIO.PwmInput -> normalizedCommand[N] -> demand[N] -> FirstOrderSpeed -> QuadraticBlade
                                                            |
 static mass/mount records -> ChassisAssembly -> hub wrench rotation + CG r x F
                                                            |
@@ -60,9 +60,9 @@ component semantic contracts or preserve this metadata through Rumoca RBC.
 | `gnss_measurement_v1` / GNSS.Sensor | position_w (3; m), velocity_w (3; m/s) | position (3; m), velocity (3; m/s) | NED, antenna |
 | `barometer_measurement_v1` / Barometer.Sensor | ambientPressure (1; Pa), ambientTemperature (1; K), altitude_w (1; m), climbRate_w (1; m/s) | pressure, temperature, altitude, climbRate (matching units) | scalar; altitude/climb rate Up-positive |
 
-Motor parameters are `tau>0`, `omegaMax>0`, `0<=omega_start<=omegaMax`.
+P0 motor parameters are `tau>0`, `omegaMax>0`, `0<=omega_start<=omegaMax`.
 Rotor `spinSign` is +1/-1 about local +z. `moment_r` is the signed aerodynamic hub
-moment, not a shaft `loadTorque`. No electrical or shaft-load port is advertised.
+moment, not a shaft `loadTorque`. P0 advertises no electrical or shaft-load port.
 `mass`, `r_C`, `R_Cj`, `inertia` and geometry/mount arrays are static parameters.
 IMU includes tangential and centripetal lever-arm acceleration. SensorSuite computes
 GNSS/barometer mount velocity including `R_wb*cross(omega_b,r_b)`.
@@ -119,12 +119,47 @@ vehicle defaults retain the old East-facing pose and sensor local axes.
 GNSS passes through as NED. `CopterInterface` additionally converts Tesla to Gauss,
 Kelvin to Celsius and NED to approximate geodetic coordinates, and computes heading
 as atan2(R_wb[2,1],R_wb[1,1]). It uses constant pressure/temperature in this profile.
-The value/FMU adapter PWM range is 1000–2000 us; the FastDyn composer boundary keeps
+The value/FMU adapter PWM range is 1000–2000 us; the VirtualIO composer boundary keeps
 1100–1900 us defaults, configurable through `[interface]`.
 
 Composer schema 3 and manifest version 2 explicitly record frames, core contract,
-P0/R0, continuous acquisition, no drag, and the selected contact profile.
+P0 or P1 with R0, continuous acquisition, no drag, and the selected contact profile.
 `[landing_gear]` resolves to `LandingGear.Parameters`; the manifest sets
 `physics.contact="four_point_spring_damper"` and `event_requirements.ground_contact=true`
 when enabled, otherwise `"none"` and `false`. Archived files are excluded from
 both staging and source hashing. Existing generated artifacts must be regenerated.
+
+## P1 voltage-only extension
+
+`Physical.Electrical.Drives.ESC.IdealVoltage` accepts `escCommand` [1] and
+`dcVoltage` [V], returning `equivalentVoltage` [V] and clamped `modulation` [1].
+Command mode is unipolar voltage modulation: `mu=clamp(escCommand,0,1)`, `Veq=mu*Vdc`.
+`dcVoltage>=0`; zero voltage is allowed. It has no switching, delay, current or power port.
+`VoltageToSpeed` accepts that voltage and owns one nonnegative speed state, with positive
+`Kv` [(rad/s)/V], `tauOmega` [s] and nonnegative `omega_start`. No speed cap is applied.
+Zero command/voltage decays speed toward zero; reverse rotation and active braking are excluded.
+
+`VoltageDrivenRotor` combines these with the existing R0 blade. Its
+`PartialVoltageDrivenRotor` contract is separate from `PartialSpeedDrivenRotor`;
+no speed demand is renamed or routed through an extra lag. Both return the same hub
+wrench and speed quantities. `PartialMultirotorPlant` owns the unchanged chassis,
+rigid body, mounting transforms and contact equations; P0 and P1 subclasses connect
+profile-specific rotor arrays to protected local wrench/kinematics arrays.
+No ESC mass is automatically added to either chassis budget.
+
+`Adapters.VirtualIO.PartialCopterInterface` shares external outputs and unit conversions.
+Both P0 and P1 compositions extend `VirtualIO.CopterInterface`, which instantiates the same
+`VirtualIO.PwmInput`. It normalizes PWM values without assigning speed/thrust/voltage semantics.
+The composer binds `commands.normalizedCommand` to P0 `plant.demand` or P1 `plant.escCommand`.
+Manifest `input_adapter` records the shared protocol, calibration and explicit plant mapping;
+`propulsion_contract` records the distinct physical contract. The VirtualIO profile binds P1 supply
+internally; `plant` exposes the voltage input with the configured default.
+
+`vio` is canonical; the CLI/API alias `fastdyn` emits identical source and canonical metadata.
+Only `Adapters.VirtualIO` remains in the active adapter package. The former `Adapters.VIO`
+and `Adapters.FastDyn` Modelica paths and legacy `demand`/`escCommand` aliases are removed.
+The CLI alias does not restore those class paths. `MultirotorValueAdapter` directly uses
+`PwmInput`, without the former compatibility-only `CommandAdapter` redeclaration.
+Standalone value/FMU adapters remain P0, using the same PWM normalizer at 1000/2000 us;
+CopterInterface still passes 1100/1900 us. Regenerate source packages and FMUs after migration.
+Only a future P2 power profile may add motor-current feedback and DC-current accounting.

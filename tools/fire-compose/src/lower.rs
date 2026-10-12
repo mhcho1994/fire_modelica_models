@@ -111,10 +111,21 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             fields(&c.landing_gear)?,
         ),
     ));
+    if c.voltage_driven() {
+        m.push(Modifier::Bind(
+            "dcVoltage".into(),
+            literal(&c.power["dcVoltage"])?,
+        ));
+    }
     if c.models.contains_key("rotor") {
         m.push(Modifier::RedeclareModel {
             name: "RotorUnit".into(),
-            class: "fire_modelica_models.Systems.Propulsion.SpeedDrivenRotor".into(),
+            class: if c.voltage_driven() {
+                "fire_modelica_models.Systems.Propulsion.VoltageDrivenRotor"
+            } else {
+                "fire_modelica_models.Systems.Propulsion.SpeedDrivenRotor"
+            }
+            .into(),
             modifiers: vec![],
         });
     }
@@ -122,7 +133,12 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
-    let plant_class = "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors";
+    let profile = crate::canonical_profile(profile)?;
+    let plant_class = if c.voltage_driven() {
+        "fire_modelica_models.Vehicles.Copter.VoltageDrivenMultirotorWithSensors"
+    } else {
+        "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors"
+    };
     let mut modifiers = plant_modifiers(c)?;
     match profile {
         "plant" => {
@@ -135,7 +151,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
                 equalities: vec![],
             })
         }
-        "fastdyn" => {
+        "vio" => {
             modifiers.push(Modifier::Bind(
                 "pressure".into(),
                 Value::Reference("ambientPressure".into()),
@@ -152,7 +168,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             boundary.extend(fields(&c.interface)?);
             Ok(CompositionSpec {
                 name: c.model_name.clone(),
-                base: "fire_modelica_models.Adapters.FastDyn.CopterInterface".into(),
+                base: "fire_modelica_models.Adapters.VirtualIO.CopterInterface".into(),
                 modifiers: boundary,
                 components: vec![Instance {
                     class: plant_class.into(),
@@ -160,7 +176,11 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
                     modifiers,
                 }],
                 equalities: [
-                    ("plant.demand", "commands.demand"),
+                    if c.voltage_driven() {
+                        ("plant.escCommand", "commands.normalizedCommand")
+                    } else {
+                        ("plant.demand", "commands.normalizedCommand")
+                    },
                     ("values.measurements", "plant.measurements"),
                     ("truth", "plant.truth"),
                     ("rotorSpeed", "plant.rotors.rotorSpeed"),
@@ -171,7 +191,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             })
         }
         _ => Err(format!(
-            "unsupported profile {profile}; expected plant or fastdyn"
+            "unsupported profile {profile}; expected plant or vio"
         )),
     }
 }

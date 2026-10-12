@@ -16,12 +16,20 @@ pub struct ResolvedFireConfig {
     pub geometry: Table,
     pub mass: Table,
     pub motor: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub power: Table,
     pub landing_gear: Table,
     pub initial: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub models: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub interface: Table,
+}
+
+impl ResolvedFireConfig {
+    pub fn voltage_driven(&self) -> bool {
+        self.models.get("rotor").and_then(Value::as_str) == Some("voltage_driven")
+    }
 }
 
 fn table<'a>(v: &'a Value, allowed: &[&str], label: &str) -> Result<&'a Table> {
@@ -486,6 +494,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         "geometry",
         "mass",
         "motor",
+        "power",
         "landing_gear",
         "initial",
         "models",
@@ -521,10 +530,25 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let (preset, g) = geometry(&section(root, "geometry"))?;
     let m = mass(&section(root, "mass"), &g)?;
     let nr = g["nRotors"].as_integer().unwrap() as usize;
-    let motor = resolve_motor(&section(root, "motor"), nr)?;
+    let models = resolve_models(&section(root, "models"))?;
+    let voltage_driven = models.get("rotor").and_then(Value::as_str) == Some("voltage_driven");
+    let motor = resolve_motor(&section(root, "motor"), nr, voltage_driven)?;
+    let power = if voltage_driven {
+        let raw = section(root, "power");
+        let t = table(&raw, &["dcVoltage"], "power")?;
+        let voltage = t
+            .get("dcVoltage")
+            .ok_or("P1 requires power.dcVoltage [V]")?;
+        number(voltage, "power.dcVoltage", false, true)?;
+        t.clone()
+    } else {
+        if root.contains_key("power") {
+            return Err("power is only supported for models.rotor=voltage_driven (P1)".into());
+        }
+        Table::new()
+    };
     let landing_gear = resolve_landing_gear(&section(root, "landing_gear"))?;
     let initial = resolve_initial(&section(root, "initial"))?;
-    let models = resolve_models(&section(root, "models"))?;
     let interface = resolve_interface(&section(root, "interface"))?;
     Ok(ResolvedFireConfig {
         schema_version: version,
@@ -534,6 +558,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         geometry: g,
         mass: m,
         motor,
+        power,
         landing_gear,
         initial,
         models,
@@ -541,15 +566,28 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     })
 }
 
-fn resolve_motor(raw: &Value, n: usize) -> Result<Table> {
-    let fields = [
-        ("omegaMax", 1000.),
-        ("tau", 0.03),
-        ("kT", 1e-5),
-        ("kQ", 1.5e-7),
-        ("omega_start", 0.),
-    ];
+fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
+    let fields = if voltage_driven {
+        [
+            ("Kv", 1000. / 16.),
+            ("tauOmega", 0.03),
+            ("kT", 1e-5),
+            ("kQ", 1.5e-7),
+            ("omega_start", 0.),
+        ]
+    } else {
+        [
+            ("omegaMax", 1000.),
+            ("tau", 0.03),
+            ("kT", 1e-5),
+            ("kQ", 1.5e-7),
+            ("omega_start", 0.),
+        ]
+    };
     let t = table(raw, &fields.map(|(k, _)| k), "motor")?;
+    if voltage_driven && !t.contains_key("Kv") {
+        return Err("P1 requires motor.Kv in (rad/s)/V, not rpm/V".into());
+    }
     let mut out = Table::new();
     for (k, default) in fields {
         let v = t.get(k).cloned().unwrap_or(Value::Float(default));
@@ -563,15 +601,16 @@ fn resolve_motor(raw: &Value, n: usize) -> Result<Table> {
             number(
                 x,
                 &format!("motor.{k}"),
-                ["omegaMax", "tau", "kT"].contains(&k),
+                ["omegaMax", "tau", "Kv", "tauOmega", "kT"].contains(&k),
                 true,
             )?;
         }
         out.insert(k.into(), v);
     }
     for i in 0..n {
-        if number(&out["omega_start"][i], "motor", false, false)?
-            > number(&out["omegaMax"][i], "motor", false, false)?
+        if !voltage_driven
+            && number(&out["omega_start"][i], "motor", false, false)?
+                > number(&out["omegaMax"][i], "motor", false, false)?
         {
             return Err("motor.omega_start must not exceed omegaMax".into());
         }
@@ -682,8 +721,11 @@ fn resolve_models(raw: &Value) -> Result<Table> {
         "models",
     )?;
     if let Some(rotor) = t.get("rotor") {
-        if rotor.as_str() != Some("speed_driven") {
-            return Err("models.rotor: supported model is speed_driven".into());
+        if !matches!(rotor.as_str(), Some("speed_driven" | "voltage_driven")) {
+            return Err(
+                "models.rotor: supported models are speed_driven (P0) and voltage_driven (P1)"
+                    .into(),
+            );
         }
     }
     for key in ["imu", "magnetometer", "gnss", "barometer"] {

@@ -1,6 +1,6 @@
 # FIRE 최소 multicopter 모델
 
-활성 패키지는 `MULTICOPTER_INTERFACES.md` v0.7과
+활성 패키지는 `MULTICOPTER_INTERFACES.md` v0.8과
 `261006_quadrotor-fidelity-port-contract.md`의 최초 실행 범위를 구현합니다.
 **연속 P0 motor + R0 rotor + 단일 6DOF 강체 + 이상 센서 + 4점 탄성 착륙다리**, SI 단위,
 world NED / chassis·body FRD가 기본입니다.
@@ -9,19 +9,63 @@ world NED / chassis·body FRD가 기본입니다.
 - `Vehicles.Copter.MultirotorWithSensors`: IMU, magnetometer, GNSS, barometer를 추가합니다.
 - `Vehicles.Copter.Presets`: QuadX, HexaX, OctoX, CoaxialX8. Coaxial은 배치만 다르며 간섭 공력은 없습니다.
 - `Physical.Mechanical.Chassis`: aggregate 또는 정적 부품 합성으로 질량·CG·full inertia를 계산합니다.
-- `Adapters.FastDyn`: 연속 PWM 숫자 정규화, sensor-local→FRD 변환, NED 출력 및 FMU 경계입니다.
+- `Adapters.VirtualIO`: 연속 PWM 숫자 정규화, sensor-local→FRD 변환, NED 출력 및 FMU 경계입니다.
 
 `demand`는 **추력 비율이 아닌 목표 회전속도 비율**입니다. 모터 lag는 한 번만 적용됩니다.
 센서는 연속 이상 관측식이며 기본 bias는 0입니다. 샘플링·hold·timestamp·응답 필터는 없습니다.
 4점 착륙다리는 기본 활성화되어 수평 지면에서 기체를 지지합니다.
 `landingGear(enabled=false)`를 지정하면 지면을 통과하는 자유낙하 모델이 됩니다.
-일반 지형·항력·전기 motor/ESC·배터리·프로토콜 모델은 활성 경로에 없습니다.
+P1은 ideal voltage-only ESC와 전압 기반 속도 응답을 추가합니다.
+일반 지형·항력·모터 전류/토크·배터리·프로토콜 모델은 활성 경로에 없습니다.
 
 질량 record에는 `mass`, `r_C`, `R_Cj`, `inertia`만 포함합니다. 부품 `componentId`는
 TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 않은 ID의 중복을 검사합니다.
 직접 작성하는 Modelica의 `MassProperties(...)` 및 파생 record 생성자에서는 `componentId`
 수정자를 제거해야 합니다. Composer를 거치지 않는 경우 부품 중복 계상은 호출자가 확인해야 하며,
 질량·회전행렬·관성의 물리적 유효성 검사는 기존 Modelica 함수에서 계속 수행합니다.
+
+## P0 유지와 P1 선택
+
+기존 `quad.toml`, `hex.toml`, `SpeedDrivenRotor`, plant의 `demand` 포트는 P0 기본 경로로 유지합니다.
+P1은 `configs/quad_p1.toml`, `configs/hex_p1.toml`에서 `models.rotor="voltage_driven"`으로 선택합니다.
+
+- ESC: `Physical.Electrical.Drives.ESC.IdealVoltage`.
+  `equivalentVoltage = clamp(escCommand,0,1)*dcVoltage`를 상태 없이 계산합니다.
+- 속도 응답: `Systems.Propulsion.ResponseModels.VoltageToSpeed`.
+  `der(omega)=(Kv*equivalentVoltage-omega)/tauOmega`로 속도 상태를 한 번 소유합니다.
+- 조립체: `Systems.Propulsion.VoltageDrivenRotor`와 `Vehicles.Copter.VoltageDrivenMultirotorWithSensors`.
+- PWM 변환: P0/P1 공통 `Adapters.VirtualIO.PwmInput`. Composer가 `normalizedCommand`를 P1의 `escCommand`에 연결해 단방향 전압 변조 비율로 해석합니다.
+
+P1 설정에는 `motor.Kv`와 `power.dcVoltage`를 명시해야 합니다. `Kv` 단위는 **(rad/s)/V**이며
+rpm/V는 `2*pi/60`을 곱해 변환합니다. `tauOmega` 기본값은 0.03 s입니다.
+P0의 `omegaMax`/`tau`와 P1의 `Kv`/`tauOmega`를 혼용하면 composer가 거부합니다.
+`Kv*Vnom=omegaMax`, 같은 시정수·초기속도·수치 명령에서는 명목 P1 응답이 P0와 일치합니다.
+예제의 16 V·62.5 (rad/s)/V는 비교용 수치이며 실제 기체 보정값이 아닙니다.
+
+현재 P1은 전류·소비전력·축부하 피드백·역회전·능동 제동을 포함하지 않습니다.
+전압 0에서는 속도가 지수적으로 감소하며 별도 최대속도 포화는 없습니다.
+`Examples.QuadVoltageSag`는 hover 상태에서 1초에 전압을 16 V에서 12 V로 낮춥니다.
+
+상위 FastDyn의 `configs/copter462_fire_p1.toml`로 P1 FMU를 선택할 수 있습니다.
+DC 공급은 내부 고정값이고 외부 PWM·센서 IO는 유지합니다. P0는 `configs/copter462_fire_p0.toml`로 이름을 변경했습니다.
+독립 `plant` 프로파일은 `escCommand`, `dcVoltage` 입력을 노출하며 설정 전압은 입력 기본값입니다.
+단독 시뮬레이션/FMU로 실행할 때는 입력을 명시적으로 공급하거나 상위 harness에 인스턴스화하세요.
+
+## VirtualIO 공통 경계와 호환성
+
+P0/P1은 같은 `Adapters.VirtualIO.CopterInterface`와 `PwmInput`을 사용합니다.
+연속 PWM 숫자 정규화 결과 `normalizedCommand`는 [0,1]이며, composer가 P0 `plant.demand`
+또는 P1 `plant.escCommand`에 연결합니다. Channel→rotor mapping은 plant의 책임입니다.
+Composer `[interface] pwm_min/pwm_max`는 기본 1100/1900 μs,
+standalone ValueAdapter/Fmu는 기존 1000/2000 μs를 유지합니다.
+
+새 CLI는 `--profile vio`이며 기존 `--profile fastdyn`도 canonical `vio`로 처리합니다.
+Modelica의 `Adapters.VIO`와 `Adapters.FastDyn`은 제거했습니다. 외부 모델은
+`Adapters.VirtualIO`로 경로를 바꾸고 `commands.demand/escCommand`를 공통
+`commands.normalizedCommand`로 변경한 뒤 plant의 물리 입력에 연결해야 합니다.
+단독 PwmInput의 기본값은 1000/2000 μs이므로 기존 P1 PWM adapter를 옮길 때는
+1100/1900 μs를 명시하세요. 공통 CopterInterface는 이 값을 이미 전달합니다.
+Staged source와 FMU를 재생성하면 이전 패키지도 제거됩니다.
 
 ## 실행
 
@@ -31,7 +75,7 @@ python3 tools/verify.py
 FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p test_composer.py
 python3 tools/probe_export.py
 cargo run --locked --offline --manifest-path tools/fire-compose/Cargo.toml -- \
-  check configs/quad.toml --profile fastdyn
+  check configs/quad.toml --profile vio
 ```
 
 OpenModelica와 Modelica 4.0.0이 필요합니다. FMU probe는 Linux FMI 2.0 Co-Simulation을 검사합니다.
@@ -104,4 +148,5 @@ TOML은 **schema_version=3**만 허용합니다. 기존 schema 1/2, 옛 `[ground
 
 [검증 범위](docs/validation.md), [센서 계약](Systems/Sensing/README.md),
 [조합 도구](tools/fire-compose/README.md)를 참고하세요.
-Rumoca RBC 연결, FMI 3 packaging, 실제 FastDyn firmware 통합은 이 변경의 검증 범위 밖입니다.
+P1 확장에서는 상위 FastDyn 통합 테스트로 Rumoca FMI 3 packaging과 실제 Co-Simulation stepping을 검증합니다.
+RBC 연결과 실제 firmware/비행 검증은 해당 테스트 범위 밖입니다.

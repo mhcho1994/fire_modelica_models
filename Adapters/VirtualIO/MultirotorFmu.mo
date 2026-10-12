@@ -1,11 +1,11 @@
-within fire_modelica_models.Adapters.FastDyn;
+within fire_modelica_models.Adapters.VirtualIO;
 
 model MultirotorFmu "Flat FMI boundary with continuous measurements and separate continuous truth"
   parameter fire_modelica_models.Vehicles.Copter.Geometry geometry;
   parameter fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.Parameters landingGear;
   parameter Real p_start[3]={0,0,-1};
   input Real pwm_us[geometry.nActuators];
-  fire_modelica_models.Adapters.FastDyn.MultirotorValueAdapter adapter(
+  fire_modelica_models.Adapters.VirtualIO.MultirotorValueAdapter adapter(
     geometry=geometry, p_start=p_start, landingGear=landingGear);
   output Real acceleration_frd[3] "Specific force [m/s2]";
   output Real gyro_frd[3] "rad/s";

@@ -1,5 +1,5 @@
-within fire_modelica_models.Adapters.FastDyn;
-partial model CopterInterface "FastDyn FMI value contract; the composer supplies one plant"
+within fire_modelica_models.Adapters.VirtualIO;
+partial model PartialCopterInterface "VirtualIO FMI value contract; the composer supplies one plant"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Real pwm_min = 1100;
   parameter Real pwm_max = 1900;
@@ -20,14 +20,11 @@ partial model CopterInterface "FastDyn FMI value contract; the composer supplies
   output Real baro_climb_rate_mps;
   output Real rotorSpeed[geometry.nRotors];
   output Interfaces.VehicleState truth;
-  PwmDemand commands(nChannels=geometry.nActuators, pwmMin=fill(pwm_min,geometry.nActuators),
-    pwmMax=fill(pwm_max,geometry.nActuators));
   SensorValues values(geometry=geometry);
 protected
   Real ambientPressure;
   Real ambientTemperature;
 equation
-  commands.pulseWidth_us=pwm;
   accel=values.acceleration_frd;
   gyro=values.gyro_frd;
   mag=10000*values.magneticField_frd;
@@ -42,4 +39,4 @@ equation
   baro_climb_rate_mps=values.measurements.climbRate;
   ambientTemperature=288.15;
   ambientPressure=101325;
-end CopterInterface;
+end PartialCopterInterface;

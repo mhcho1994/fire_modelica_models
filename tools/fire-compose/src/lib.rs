@@ -83,3 +83,14 @@ pub fn identifier(name: &str) -> bool {
         ]
         .contains(&name)
 }
+
+/// Canonicalize the host boundary profile while accepting the legacy CLI/API name.
+pub fn canonical_profile(profile: &str) -> Result<&str> {
+    match profile {
+        "plant" => Ok("plant"),
+        "vio" | "fastdyn" => Ok("vio"),
+        _ => Err(format!(
+            "unsupported profile {profile}; expected plant or vio (legacy alias: fastdyn)"
+        )),
+    }
+}

@@ -1,10 +1,11 @@
-within fire_modelica_models.Adapters.FastDyn;
+within fire_modelica_models.Adapters.VirtualIO;
 model MultirotorValueAdapter "Flat value boundary for host integration; not a firmware driver"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Physical.Mechanical.Chassis.LandingGear.Parameters landingGear;
   parameter Real p_start[3]={0,0,-1};
   input Real pwm_us[geometry.nActuators];
-  PwmDemand commands(nChannels=geometry.nActuators);
+  PwmInput commands(nChannels=geometry.nActuators,
+    pwmMin=fill(1000,geometry.nActuators),pwmMax=fill(2000,geometry.nActuators));
   Vehicles.Copter.MultirotorWithSensors vehicle(geometry=geometry,p_start=p_start,landingGear=landingGear);
   output Real acceleration_frd[3] "Specific force [m/s2]";
   output Real gyro_frd[3] "rad/s";
@@ -19,7 +20,7 @@ model MultirotorValueAdapter "Flat value boundary for host integration; not a fi
   output Interfaces.VehicleState truth "Separate NED/FRD simulation truth";
 equation
   commands.pulseWidth_us=pwm_us;
-  vehicle.demand=commands.demand;
+  vehicle.demand=commands.normalizedCommand;
   acceleration_frd=geometry.R_bImu*vehicle.measurements.acceleration;
   gyro_frd=geometry.R_bImu*vehicle.measurements.gyro;
   magneticField_frd=geometry.R_bMag*vehicle.measurements.magneticField;

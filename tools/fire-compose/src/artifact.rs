@@ -105,6 +105,7 @@ pub fn emit(
     root: &Path,
     output: &Path,
 ) -> Result<(PathBuf, PathBuf)> {
+    let profile = crate::canonical_profile(profile)?;
     let source = format!("{HEADER}{}", lower::compose(config, profile)?.emit()?);
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let output = resolved(output)?;
@@ -141,7 +142,7 @@ pub fn emit(
         "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":2,
         "core_contract":"ned_frd_continuous_v1",
         "frames":{"world":"NED","body":"FRD","chassis":"FRD","rotor":"local +z thrust","sensor":"local; v_b=R_bs*v_s"},
-        "physics":{"propulsion":"P0","rotor_aero":"R0","body":"rigid_6dof","drag":"none",
+        "physics":{"propulsion":if config.voltage_driven() { "P1" } else { "P0" },"rotor_aero":"R0","body":"rigid_6dof","drag":"none",
                    "contact":if ground_contact { "four_point_spring_damper" } else { "none" },
                    "sensors":"ideal_with_fixed_bias","acquisition":"continuous"},
         "schema_version":config.schema_version,"profile":profile,"model":config.model_name,
@@ -149,9 +150,31 @@ pub fn emit(
         "generated_model_sha256":hash(source.as_bytes()),
         "interface":{"nRotors":config.geometry["nRotors"],"nActuators":config.geometry["nActuators"],
                      "actuatorIndex":config.geometry["actuatorIndex"]},
-        "event_requirements":{"sampled_sensors":config.acquisition=="sampled","sampled_actuators":profile=="fastdyn" && config.acquisition=="sampled","ground_contact":ground_contact},
+        "event_requirements":{"sampled_sensors":config.acquisition=="sampled","sampled_actuators":profile=="vio" && config.acquisition=="sampled","ground_contact":ground_contact},
         "verification":{"configuration":"passed","modelica_check":"not_run","fmi_generation":"not_run","fmu_simulation":"not_run","firmware":"not_run"}
     });
+    if profile == "vio" {
+        manifest_value["input_adapter"] = json!({
+            "class":"fire_modelica_models.Adapters.VirtualIO.PwmInput",
+            "input_contract":"pwm_pulse_command_v1",
+            "output_contract":"normalized_pwm_command_v1",
+            "input_unit":"us", "output_unit":"1", "acquisition":"continuous",
+            "normalization":"clamp((pulseWidth_us-pwmMin)/(pwmMax-pwmMin),0,1)",
+            "pwm_min_us":config.interface["pwm_min"], "pwm_max_us":config.interface["pwm_max"],
+            "plant_input":if config.voltage_driven() { "plant.escCommand" } else { "plant.demand" },
+            "plant_mapping":if config.voltage_driven() { "linear_voltage_modulation" } else { "linear_target_speed_ratio" }
+        });
+    }
+    manifest_value["propulsion_contract"] = if config.voltage_driven() {
+        json!({"command":"esc_command_v1", "control_mode":"unipolar_voltage_modulation",
+               "mapping":"clamp(escCommand,0,1)", "voltage":"equivalent_voltage_command_v1",
+               "supply":if profile == "vio" { "internal_constant" } else { "input_default" }, "dcVoltage_V":config.power["dcVoltage"],
+               "speed_gain_unit":"(rad/s)/V", "power_accounting":false,
+               "load_feedback":false, "speed_states_per_rotor":1})
+    } else {
+        json!({"command":"speed_command_v1", "power_accounting":false,
+               "load_feedback":false, "speed_states_per_rotor":1})
+    };
     if let Some(prior) = previous {
         if ["config_sha256", "generated_model_sha256", "profile"]
             .iter()

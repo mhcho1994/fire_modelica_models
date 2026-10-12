@@ -3,7 +3,7 @@
 [Korean version](README_ko.md)
 
 The active package implements the initial execution scope defined in
-`MULTICOPTER_INTERFACES.md` v0.7 and `261006_quadrotor-fidelity-port-contract.md`.
+`MULTICOPTER_INTERFACES.md` v0.8 and `261006_quadrotor-fidelity-port-contract.md`.
 The baseline consists of **continuous P0 motors + R0 rotors + a single 6DOF rigid body
 + ideal sensors + four-point compliant landing gear**, using SI units, a NED world frame, and FRD chassis/body frames.
 
@@ -11,14 +11,67 @@ The baseline consists of **continuous P0 motors + R0 rotors + a single 6DOF rigi
 - `Vehicles.Copter.MultirotorWithSensors`: adds an IMU, magnetometer, GNSS, and barometer.
 - `Vehicles.Copter.Presets`: QuadX, HexaX, OctoX, and CoaxialX8. The coaxial preset changes only the layout; aerodynamic interference is not modeled.
 - `Physical.Mechanical.Chassis`: computes mass, CG, and the full inertia tensor from aggregate properties or a static assembly of parts. `LandingGear` reuses the archived point-contact models with FRD mounts and a NED ground normal.
-- `Adapters.FastDyn`: provides continuous PWM value normalization, sensor-local to FRD conversion, NED outputs, and an FMU boundary.
+- `Adapters.VirtualIO`: provides continuous PWM value normalization, sensor-local to FRD conversion, NED outputs, and an FMU boundary.
 
 `demand` is a **target rotor-speed ratio, not a thrust ratio**. Motor lag is applied once.
 Sensors use continuous ideal measurement equations with zero bias by default. There is no
 sampling, hold, timestamp, or response filter. Landing gear is enabled by default and supports
 the vehicle on a stationary horizontal plane. Set `landingGear(enabled=false)` for freefall
-through the plane. General terrain, drag, electrical motor/ESC, battery, and protocol models
-remain outside the active path.
+through the plane. P1 adds an ideal voltage-only ESC and voltage-to-speed surrogate.
+General terrain, drag, motor current/torque, battery, and protocol models remain outside the active path.
+
+## P0 and P1 propulsion
+
+P0 remains the default: existing `quad.toml`, `hex.toml`, `SpeedDrivenRotor` and
+the plant `demand` port retain their target-speed contract. Select `models.rotor="voltage_driven"`
+with `configs/quad_p1.toml` or `configs/hex_p1.toml` for P1:
+
+```text
+PWM number -> VirtualIO.PwmInput -> normalizedCommand -> escCommand -> IdealVoltage ESC
+                                                       + dcVoltage
+                                                            |
+                                                  VoltageToSpeed -> QuadraticBlade
+```
+
+`Physical.Electrical.Drives.ESC.IdealVoltage` computes
+`equivalentVoltage = clamp(escCommand,0,1)*dcVoltage` without states.
+`Systems.Propulsion.ResponseModels.VoltageToSpeed` owns the single speed state:
+`der(omega) = (Kv*equivalentVoltage-omega)/tauOmega`. The command selects unipolar
+voltage modulation. It is not a target-speed command despite the same numeric range.
+P1 has no current, power accounting, load feedback, reverse rotation or active braking.
+Zero voltage gives exponential coast-down. There is no additional speed cap.
+
+P1 requires explicit `motor.Kv` in **(rad/s)/V** and nonnegative `power.dcVoltage` [V].
+Convert rpm/V by multiplying by `2*pi/60`. `tauOmega` defaults to 0.03 s; motor fields
+accept a scalar or one value per rotor. P0's `omegaMax`/`tau` and P1's `Kv`/`tauOmega`
+are deliberately separate and cross-profile fields are rejected. With `Kv*Vnom=omegaMax`,
+equal time constants and initial speeds, nominal P1 matches P0 under equal numeric commands.
+The examples use 16 V and 62.5 (rad/s)/V as illustrative coefficients, not aircraft calibration.
+
+`Examples.QuadVoltageSag` starts at hover and lowers the supply from 16 V to 12 V at 1 s.
+The FastDyn config `configs/copter462_fire_p1.toml` (in the parent FastDyn repository)
+uses an internal fixed supply and preserves the external PWM/sensor FMI boundary.
+`configs/copter462_fire_p0.toml` selects P0 (renamed from `copter462_fire.toml`). For standalone `plant` composition,
+`escCommand` and `dcVoltage` are input ports; the configured voltage is an input default.
+When running that model directly as a simulation/FMU, set those inputs explicitly or
+instantiate it in a harness. No current or battery-SOC port is exported.
+
+## Common VirtualIO boundary
+
+Both P0 and P1 extend `Adapters.VirtualIO.CopterInterface` and use the same `PwmInput`.
+The adapter continuously clamps numeric pulse width to `normalizedCommand` in [0,1].
+The composer binds it to P0 `plant.demand` (target speed ratio) or P1 `plant.escCommand`
+(voltage modulation). Channel-to-rotor mapping stays in the plant.
+`[interface] pwm_min/pwm_max` defaults to 1100/1900 us; standalone value/FMU adapters
+keep 1000/2000 us. External PWM/sensor fields and units remain unchanged.
+
+Use `--profile vio`; `--profile fastdyn` remains an alias and emits canonical `vio`
+metadata. Modelica packages `Adapters.VIO` and `Adapters.FastDyn` are removed;
+update source references to `Adapters.VirtualIO` and replace `commands.demand` or
+`commands.escCommand` with `commands.normalizedCommand` at the appropriate plant binding.
+Standalone `PwmInput` defaults to 1000/2000 us; a migrated legacy P1 PWM adapter must
+explicitly pass 1100/1900 us (the shared CopterInterface already does so).
+Regenerate composed sources and FMUs to remove old staged packages and update the cache.
 
 ## Running the models
 
@@ -28,7 +81,7 @@ python3 tools/verify.py
 FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p test_composer.py
 python3 tools/probe_export.py
 cargo run --locked --offline --manifest-path tools/fire-compose/Cargo.toml -- \
-  check configs/quad.toml --profile fastdyn
+  check configs/quad.toml --profile vio
 ```
 
 OpenModelica and Modelica 4.0.0 are required. The FMU probe checks FMI 2.0 Co-Simulation on Linux.
@@ -103,5 +156,6 @@ records do not certify the new models.
 
 See the [validation scope](docs/validation.md), [sensor contracts](Systems/Sensing/README.md),
 and [composition tool](tools/fire-compose/README.md) for details.
-Rumoca RBC linking, FMI 3 packaging, and actual FastDyn firmware integration are outside
-this change's validation scope.
+The P1 extension additionally exercises Rumoca FMI 3 packaging and real Co-Simulation
+steps through the parent FastDyn integration test. RBC linking and actual firmware/flight
+validation remain outside that test's scope.

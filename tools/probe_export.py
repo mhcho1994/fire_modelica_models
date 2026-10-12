@@ -143,7 +143,7 @@ def run(output, omc):
         work = output / preset
         work.mkdir(exist_ok=True)
         harness = work / "ExportCopter.mo"
-        harness.write_text('model ExportCopter\n  extends fire_modelica_models.Adapters.FastDyn.MultirotorFmu(\n'
+        harness.write_text('model ExportCopter\n  extends fire_modelica_models.Adapters.VirtualIO.MultirotorFmu(\n'
             f'    geometry=fire_modelica_models.Vehicles.Copter.Presets.{preset}());\nend ExportCopter;\n')
         script = work / "export.mos"
         script.write_text('loadModel(Modelica,{"4.0.0"});\n'

@@ -64,3 +64,85 @@ They describe the current sources only. Historical ENU/FLU contact, sampling, fi
 and rover results remain with the archived package and do not certify this profile.
 These checks do not exercise Rumoca component RBC reuse/linking, FMI 3 packaging, actual
 FastDyn firmware integration, or flight calibration. Aircraft coefficients are illustrative.
+
+## P1 extension validation (2026-10-12)
+
+`IdealEscVoltage`, `VoltagePropulsion` and `VoltageMultirotor` check command clamping,
+per-channel PWM ranges, supply steps/zero supply, nonzero initial speed, the analytical
+first-order trajectory, independent speed states, nominal P0/P1 equivalence and common
+vehicle wrench/contact/sensor behavior. They pass with OpenModelica 1.26.1.
+`Examples.QuadVoltageSag` also simulates successfully: its 16-to-12 V supply change
+reduces speed from 606.42343 to 454.81757 rad/s, a ratio of 0.75.
+
+All 19 composer tests pass with `FIRE_TEST_OMC=1`, including generated P1 quad/hexa
+`plant` and `vio` profiles, independent gains/time constants/initial speeds,
+nontrivial actuator mapping, invalid/cross-profile parameters, and verification-cache
+invalidation when selecting P1. Rust clippy passes with warnings denied.
+
+The complete native suite currently passes 24/27 simulations. The failures are
+`ChassisMassProperties` (aggregate mass), `ContactWrenchCG` (shifted-CG contact moment)
+and `MultirotorFrames` (shifted-CG hub moment). All three reproduce with the **unchanged
+pre-P1 HEAD `fedff92`** in a separate package copy under the same compiler. They are
+existing failures, not a claim that the entire P0 suite is green. The main verification
+runner stops at these failures, before its separate invalid-chassis checks.
+Artifacts for this run are in `build/p1-verification/`, including `native.log`,
+`prechange-baseline.log` and `p1-report.json`; composer output is in `build/p1-composer-tests.log`.
+
+Run the additional FMI 3 integration tests from the **FastDyn repository root**:
+
+```sh
+FASTDYN_TEST_RUMOCA_DIR=third_party/common/rumoca PYTHONPATH=src \
+  python3 -m unittest discover -s tests/integration -p test_fire_propulsion_profiles.py
+```
+
+All four cases pass: P0 quad, nominal P1 quad, half-voltage P1 quad, and P1 hexa with
+8 PWM channels mapped onto 6 rotors. Each case composes, compiles with Rumoca, packages
+the source FMU, loads the packaged binary and its own metadata, initializes and calls
+`fmi3DoStep` for 0.08 s with a 0.1 ms step. Checks cover the sole external input `pwm`,
+array shapes, channel mapping, analytical rotor speed (absolute tolerance 1e-3 rad/s),
+finite sensor outputs and the internal DC supply. Logs are in FastDyn's `out/virtualio-fmi3-tests.log`.
+This test does not run flight-controller firmware or validate battery/current/shaft physics.
+
+A persistent runnable P1 quad artifact can be built from FastDyn with:
+
+```sh
+python3 utils/build_fmi3_fmu.py --config configs/copter462_fire_p1.toml --skip-submodules
+```
+
+`configs/copter462_fire_p0.toml` selects P0 (renamed from `copter462_fire.toml`). Both profiles retain
+identical external PWM and sensor field names; P1's additional voltage connection is internal.
+
+
+## Shared VirtualIO update validation (2026-10-12)
+
+The active adapter package is now `Adapters.VirtualIO`. Both `Adapters.VIO` and
+`Adapters.FastDyn` are removed, along with the compatibility-only command redeclaration
+and legacy wrapper test. The `vio` profile name and `fastdyn` CLI alias remain.
+
+All 19 composer tests pass, including canonical/alias equivalence for P0/P1, shared
+adapter metadata, supply binding and regeneration of an existing staged library.
+The staging test seeds obsolete VIO/FastDyn packages and verifies that regeneration
+removes both. Source manifests also exclude these removed classes.
+`AdapterChannels`, `ContinuousSignals`, `NedFrdContract` and `IdealEscVoltage` use the
+canonical VirtualIO classes. The native suite passes 24/27 with the same three baseline
+failures above; removal of the obsolete legacy test accounts for the reduced case count.
+Current logs: `build/virtualio-verification/native.log` and
+`build/virtualio-composer-tests.log`. Earlier P1 logs retain baseline evidence.
+
+All four FMI3 cases pass with VirtualIO, including out-of-range PWM clamping, channel
+mapping, analytical speed, sensor outputs, metadata and P1 internal supply. The standalone
+`VirtualIO.MultirotorFmu` also passes the quad/hexa FMI2 export/runtime probe, including
+motor/sensor outputs, settling, takeoff and landing. Its report is in
+`build/virtualio-export-validation/report.json`. Rust clippy passes with warnings denied.
+The 13 FastDyn configuration/cache unit tests passed during the preceding common-adapter
+update; the VirtualIO rename preserves those configuration names and paths.
+
+Actual flight-controller execution remains unverified. The FastDyn C FMU host still
+handles four PWM channels, whereas the Python FMI3 probe is array-aware and tests the
+eight-channel/six-rotor hexa artifact.
+
+Both persistent FastDyn configs were rebuilt successfully after the rename:
+`configs/copter462_fire_p0.toml` -> `out/fmi3/ConfiguredQuad/ConfiguredQuad.fmu` and
+`configs/copter462_fire_p1.toml` -> `out/fmi3/ConfiguredQuadP1/ConfiguredQuadP1.fmu`.
+Their staged libraries contain only `Adapters/VirtualIO`. Build logs are
+`out/virtualio-p0-build.log` and `out/virtualio-p1-build.log` in FastDyn.

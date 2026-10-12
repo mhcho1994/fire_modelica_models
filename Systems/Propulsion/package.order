@@ -2,3 +2,5 @@ ResponseModels
 PartialRotorUnit
 PartialSpeedDrivenRotor
 SpeedDrivenRotor
+PartialVoltageDrivenRotor
+VoltageDrivenRotor

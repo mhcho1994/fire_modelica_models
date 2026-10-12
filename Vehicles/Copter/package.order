@@ -1,4 +1,7 @@
 Geometry
 Presets
+PartialMultirotorPlant
 MultirotorPlant
 MultirotorWithSensors
+VoltageDrivenMultirotorPlant
+VoltageDrivenMultirotorWithSensors

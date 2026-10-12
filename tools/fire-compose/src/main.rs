@@ -48,13 +48,14 @@ struct Generate {
 #[derive(Clone, Copy, ValueEnum)]
 enum Profile {
     Plant,
-    Fastdyn,
+    #[value(alias = "fastdyn")]
+    Vio,
 }
 impl Profile {
     fn name(self) -> &'static str {
         match self {
             Self::Plant => "plant",
-            Self::Fastdyn => "fastdyn",
+            Self::Vio => "vio",
         }
     }
 }

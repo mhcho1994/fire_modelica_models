@@ -31,3 +31,11 @@ stiffness = 3000.0
 damping = 150.0
 tangentialDamping = 25.0
 frictionCoefficient = 0.6
+
+[models]
+rotor = "speed_driven"
+
+# Shared VirtualIO PWM calibration for both P0 and P1.
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0
