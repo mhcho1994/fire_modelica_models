@@ -9,6 +9,7 @@ model QuadraticBlade "Static thrust and aerodynamic reaction moment at the rotor
   input Modelica.Units.SI.AngularVelocity omegaBody_r[3]
     "Carrier angular velocity; unused by this static model";
   output Modelica.Units.SI.Force force_r[3];
+  output Modelica.Units.SI.Torque loadTorque "Nonnegative resisting shaft torque magnitude";
   output Modelica.Units.SI.Torque moment_r[3]
     "Aerodynamic hub moment; does not include moment arm or rotor inertia reaction";
 initial equation
@@ -17,5 +18,6 @@ initial equation
 equation
   assert(omega >= -1e-8, "QuadraticBlade requires nonnegative speed; reverse rotation is unsupported");
   force_r = {0, 0, kT * omega ^ 2};
-  moment_r = {0, 0, -spinSign * kQ * omega ^ 2};
+  loadTorque = kQ * omega ^ 2;
+  moment_r = {0, 0, -spinSign * loadTorque};
 end QuadraticBlade;

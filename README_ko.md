@@ -9,14 +9,16 @@ world NED / chassis·body FRD가 기본입니다.
 - `Vehicles.Copter.MultirotorWithSensors`: IMU, magnetometer, GNSS, barometer를 추가합니다.
 - `Vehicles.Copter.Presets`: QuadX, HexaX, OctoX, CoaxialX8. Coaxial은 배치만 다르며 간섭 공력은 없습니다.
 - `Physical.Mechanical.Chassis`: aggregate 또는 정적 부품 합성으로 질량·CG·full inertia를 계산합니다.
-- `Adapters.VirtualIO`: 연속 PWM 숫자 정규화, sensor-local→FRD 변환, NED 출력 및 FMU 경계입니다.
+- `Adapters.VirtualIO`: 상태 없는 PWM 정규화 및 sensor-local→FRD/NED 값 변환입니다.
+- `Exports.FMU`: 외부 PWM·센서 포트와 진단 출력을 정의하며 P0/P1/P2 plant는 composer가 조립합니다.
 
 `demand`는 **추력 비율이 아닌 목표 회전속도 비율**입니다. 모터 lag는 한 번만 적용됩니다.
 센서는 연속 이상 관측식이며 기본 bias는 0입니다. 샘플링·hold·timestamp·응답 필터는 없습니다.
 4점 착륙다리는 기본 활성화되어 수평 지면에서 기체를 지지합니다.
 `landingGear(enabled=false)`를 지정하면 지면을 통과하는 자유낙하 모델이 됩니다.
 P1은 ideal voltage-only ESC와 전압 기반 속도 응답을 추가합니다.
-일반 지형·항력·모터 전류/토크·배터리·프로토콜 모델은 활성 경로에 없습니다.
+P2는 인덕턴스를 포함한 전류·토크·부하 피드백을 추가합니다.
+일반 지형·항력·배터리·프로토콜 모델은 활성 경로에 없습니다.
 
 질량 record에는 `mass`, `r_C`, `R_Cj`, `inertia`만 포함합니다. 부품 `componentId`는
 TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 않은 ID의 중복을 검사합니다.
@@ -26,46 +28,107 @@ TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 
 
 ## P0 유지와 P1 선택
 
-기존 `quad.toml`, `hex.toml`, `SpeedDrivenRotor`, plant의 `demand` 포트는 P0 기본 경로로 유지합니다.
-P1은 `configs/quad_p1.toml`, `configs/hex_p1.toml`에서 `models.rotor="voltage_driven"`으로 선택합니다.
+P0/P1은 컴포넌트 조합의 이름입니다. 클래스 이름에는 동작을 나타내며,
+composer가 ESC·Motor·Rotor 배열을 공통 기체 옆에 직접 생성하고 연결합니다.
 
-- ESC: `Physical.Electrical.Drives.ESC.IdealVoltage`.
-  `equivalentVoltage = clamp(escCommand,0,1)*dcVoltage`를 상태 없이 계산합니다.
-- 속도 응답: `Systems.Propulsion.ResponseModels.VoltageToSpeed`.
-  `der(omega)=(Kv*equivalentVoltage-omega)/tauOmega`로 속도 상태를 한 번 소유합니다.
-- 조립체: `Systems.Propulsion.VoltageDrivenRotor`와 `Vehicles.Copter.VoltageDrivenMultirotorWithSensors`.
-- PWM 변환: P0/P1 공통 `Adapters.VirtualIO.PwmInput`. Composer가 `normalizedCommand`를 P1의 `escCommand`에 연결해 단방향 전압 변조 비율로 해석합니다.
+```text
+P0: PwmInput -> ESC.PassThrough -> Motors.FirstOrderSpeed
+                                      -> QuadraticBlade -> MultirotorWithSensors
+P1: PwmInput -> ESC.AverageVoltage -> Motors.FirstOrderVoltageToSpeed
+                                      -> QuadraticBlade -> MultirotorWithSensors
+```
 
-P1 설정에는 `motor.Kv`와 `power.dcVoltage`를 명시해야 합니다. `Kv` 단위는 **(rad/s)/V**이며
-rpm/V는 `2*pi/60`을 곱해 변환합니다. `tauOmega` 기본값은 0.03 s입니다.
-P0의 `omegaMax`/`tau`와 P1의 `Kv`/`tauOmega`를 혼용하면 composer가 거부합니다.
-`Kv*Vnom=omegaMax`, 같은 시정수·초기속도·수치 명령에서는 명목 P1 응답이 P0와 일치합니다.
-예제의 16 V·62.5 (rad/s)/V는 비교용 수치이며 실제 기체 보정값이 아닙니다.
+ESC는 `Physical.Electrical.Drives.ESC`, 경험적 Motor 응답은 `Systems.Propulsion.Motors`에 둡니다.
+`PassThrough`는 [0,1] 정규화 명령을 그대로 전달합니다. `AverageVoltage`는
+`equivalentVoltage=clamp(escCommand,0,1)*dcVoltage`를 계산합니다.
+회전수 상태는 Motor에만 하나씩 있습니다.
 
-현재 P1은 전류·소비전력·축부하 피드백·역회전·능동 제동을 포함하지 않습니다.
-전압 0에서는 속도가 지수적으로 감소하며 별도 최대속도 포화는 없습니다.
-`Examples.QuadVoltageSag`는 hover 상태에서 1초에 전압을 16 V에서 12 V로 낮춥니다.
+- `FirstOrderSpeed`: `tau*der(omega)=omegaMax*clamp(demand,0,1)-omega`.
+- `FirstOrderVoltageToSpeed`: `tauOmega*der(omega)=Kv*equivalentVoltage-omega`.
 
-상위 FastDyn의 `configs/copter462_fire_p1.toml`로 P1 FMU를 선택할 수 있습니다.
-DC 공급은 내부 고정값이고 외부 PWM·센서 IO는 유지합니다. P0는 `configs/copter462_fire_p0.toml`로 이름을 변경했습니다.
-독립 `plant` 프로파일은 `escCommand`, `dcVoltage` 입력을 노출하며 설정 전압은 입력 기본값입니다.
-단독 시뮬레이션/FMU로 실행할 때는 입력을 명시적으로 공급하거나 상위 harness에 인스턴스화하세요.
+공통 `QuadraticBlade`가 회전수에서 hub 힘·모멘트를 계산합니다.
+`MultirotorPlant`는 `rotorForce_r[nRotors,3]`, `rotorMoment_r[nRotors,3]`를 입력받고,
+로터의 상대 유입속도와 기체 각속도를 출력합니다. 장착 회전과 CG의 `r×F`는 기체가 한 번 적용합니다.
+기체 내부에는 ESC·Motor·Rotor가 없으며, `MultirotorWithSensors`는 공통 센서만 추가합니다.
 
-## VirtualIO 공통 경계와 호환성
+| 조합 | models.esc | models.motor | models.rotor |
+|---|---|---|---|
+| P0 기본 | `pass_through` | `first_order_speed` | `quadratic_blade` |
+| P1 | `average_voltage` | `first_order_voltage_to_speed` | `quadratic_blade` |
 
-P0/P1은 같은 `Adapters.VirtualIO.CopterInterface`와 `PwmInput`을 사용합니다.
-연속 PWM 숫자 정규화 결과 `normalizedCommand`는 [0,1]이며, composer가 P0 `plant.demand`
-또는 P1 `plant.escCommand`에 연결합니다. Channel→rotor mapping은 plant의 책임입니다.
-Composer `[interface] pwm_min/pwm_max`는 기본 1100/1900 μs,
-standalone ValueAdapter/Fmu는 기존 1000/2000 μs를 유지합니다.
+입출력 의미가 맞지 않는 ESC/Motor 조합은 생성 전에 거부합니다.
+P0 `[motor]`는 `omegaMax/tau/omega_start`, P1은 `Kv/tauOmega/omega_start`입니다.
+공력 계수 `kT/kQ`는 `[rotor]`로 분리합니다. 각 필드는 scalar 또는 rotor 수만큼의 배열입니다.
+P1에는 `motor.Kv`와 `[power] dcVoltage`가 필수이며, Kv 단위는 **(rad/s)/V**입니다.
+rpm/V는 `2*pi/60`을 곱해 변환합니다. 예제의 16 V·62.5 (rad/s)/V는 비교용 수치입니다.
+`Kv*Vnom=omegaMax`이고 시정수·초기속도가 같으면 명목 P0/P1 응답은 같습니다.
+전류·소비전력·축부하 피드백·역회전·능동 제동은 포함하지 않습니다.
+P1은 별도 최대속도 포화가 없으며 전압 0에서 지수적으로 감속합니다.
 
-새 CLI는 `--profile vio`이며 기존 `--profile fastdyn`도 canonical `vio`로 처리합니다.
-Modelica의 `Adapters.VIO`와 `Adapters.FastDyn`은 제거했습니다. 외부 모델은
-`Adapters.VirtualIO`로 경로를 바꾸고 `commands.demand/escCommand`를 공통
-`commands.normalizedCommand`로 변경한 뒤 plant의 물리 입력에 연결해야 합니다.
-단독 PwmInput의 기본값은 1000/2000 μs이므로 기존 P1 PWM adapter를 옮길 때는
-1100/1900 μs를 명시하세요. 공통 CopterInterface는 이 값을 이미 전달합니다.
-Staged source와 FMU를 재생성하면 이전 패키지도 제거됩니다.
+상위 FastDyn의 `configs/copter462_fire_p0.toml`, `configs/copter462_fire_p1.toml`을 유지합니다.
+`--profile plant`는 두 조합 모두 `normalizedCommand`를 받으며 P1에만 기본값이 있는
+`dcVoltage` 입력을 추가합니다. `--profile vio`는 외부 PWM·센서 IO를 유지하고 공급 전압을 내부에 둡니다.
+`Examples.QuadVoltageSag`는 1초에 공급 전압을 16 V에서 12 V로 낮춥니다.
+
+이행 시 기존 `models.rotor="speed_driven"/"voltage_driven"`을 위 세 선택자로 바꾸고,
+`[motor] kT/kQ`를 `[rotor]`로 옮깁니다. 통합 rotor 모델, `ResponseModels`와
+`VoltageDrivenMultirotor*`는 제거했으며 `IdealVoltage`는 `ESC.AverageVoltage`로 바뀝니다.
+생성 source와 FMU를 재생성해야 합니다.
+
+## P2 전기·기계 결합 모델
+
+`average_unidirectional` ESC, `dynamic_dc_equivalent` motor, `quadratic_blade` rotor를
+선택합니다. `configs/quad_p2.toml`, `hex_p2.toml`은 실제 모터에 보정하지 않은 예시입니다.
+
+- `Physical.Electrical.Passives.SeriesRL`: 양방향 범용 R·L 직렬 회로입니다.
+- `Physical.Mechanical.Rotational.RigidShaft`: 회전 관성과 점성 마찰을 담당합니다.
+- `Systems.Propulsion.Motors.DynamicDCEquivalent`: 두 요소를 MSL `RotationalEMF`로 연결합니다.
+- `Systems.Propulsion.HubReaction`: 공력 모멘트와 축 가속 반력을 조합합니다.
+
+`motor.R/L/k/J`, `rotor.J`, `power.dcVoltage`를 명시해야 합니다. `b/i_start/omega_start`는
+기본 0입니다. 모터·로터 값은 scalar 또는 로터 수만큼의 배열을 받습니다.
+`rotor.J`는 모터의 `JLoad`로 전달하며 블레이드 공력 모델에는 전달하지 않습니다.
+`k`는 DC 등가 SI 변환 상수이고, P1의 경험적 `Kv`를 그대로 역수 변환해서 쓰지 않습니다.
+전류와 회전속도의 동역학은 `L*der(i)=Vm-R*i-k*omega`,
+`(J+JLoad)*der(omega)=k*i-b*omega-loadTorque`입니다.
+
+구동을 중단하면 양의 잔류 전류가 순환하며 감소합니다. 전류가 0에 도달한 뒤 출력단을
+개방하고 단자 전압은 역기전력을 따릅니다. 역전류·능동제동·회생은 없습니다.
+`esc.coast`를 `motor.currentZero`에 연결하여 실제 권선 전류의 영점 사건만 처리합니다.
+구동 명령을 끈 순간 전류를 초기화하지 않습니다. `esc.openCircuitVoltage`에는
+`motor.backEMF`를 연결합니다. 이 보조 신호들은 전기 Pin 연결과 함께 사용합니다.
+
+두 export profile에 전류·공급전류·전자기토크·부하토크·입력전력·동손·마찰손실·축동력·저장에너지
+배열 진단을 추가합니다. 전력 수지는 자기 에너지와 회전 에너지를 모두 포함합니다.
+기체에는 공력 모멘트와 `-spinSign*(J+JLoad)*der(omega)`를 한 번 반영합니다.
+기체 회전의 축 동역학 피드백과 자이로 결합은 생략한 고정 하우징 근사입니다.
+PWM 리플·3상 정류·PWM 주기 내 불연속 전도·전류 제한·배터리·열 동역학은 포함하지 않습니다.
+
+`Examples.QuadElectromechanicalCoast`에서 호버·차단·재구동을 확인할 수 있습니다.
+`python3 tools/probe_p2_export.py`는 실제 quad/hexa FMI2 실행과 적분 간격 수렴을 검사합니다.
+P2는 OpenModelica native 및 FMI2에서 검증했습니다. Rumoca/FastDyn FMI3는 현재 컴파일에 실패하며,
+제약과 검증 범위는 [validation 문서](docs/validation.md#p2-electromechanical-validation-2026-10-12)에 기록했습니다.
+새 파라미터를 사용할 때는 `L/R`에 맞춰 적분 간격을 다시 검토해야 합니다.
+
+## VirtualIO adapter와 FMU export 계층
+
+`Adapters.VirtualIO`에는 `PwmInput`, `SensorValues`만 둡니다. 두 모델은 값을 변환하며
+차량을 생성하지 않습니다. P0/P1/P2 조합은 `Exports.FMU.CopterInterface`를 상속합니다.
+`PartialCopterInterface`가 센서 포트·단위/지리 좌표 변환과 별도 `truth`/`rotorSpeed`
+진단 출력을 정의하고, `CopterInterface`가 공통 PWM adapter를 연결합니다.
+
+Composer가 `geometry.actuatorIndex`로 PWM 채널을 선택하여 `escs.escCommand`에 연결합니다.
+기체는 PWM·ESC·Motor 종류와 독립적인 hub 힘·모멘트 경계를 사용합니다. 상수 대기압 101325 Pa·온도 288.15 K도
+composer가 plant에 직접 전달하며 export 클래스에는 환경 공급식이 없습니다.
+
+CLI `--profile vio`와 기존 `--profile fastdyn` 별칭은 유지합니다. 외부 PWM·센서 이름과
+단위는 같고 `[interface] pwm_min/pwm_max`는 1100/1900 μs가 기본입니다.
+독립 `PwmInput`의 기본 범위는 1000/2000 μs이며 원하는 calibration을 명시할 수 있습니다.
+
+기존 `Adapters.VIO`/`Adapters.FastDyn` 경로와 standalone `MultirotorValueAdapter`,
+`MultirotorFmu`는 제거했습니다. CopterInterface를 상속하던 외부 source는 `Exports.FMU`로
+변경하고 staged source와 FMU를 재생성하세요. `tools/probe_export.py`도 composer로 만든
+P0/P1 quad/hexa를 사용해 별도 차량 조립 없이 동일한 export 계약을 검증합니다.
 
 ## 실행
 
@@ -150,3 +213,11 @@ TOML은 **schema_version=3**만 허용합니다. 기존 schema 1/2, 옛 `[ground
 [조합 도구](tools/fire-compose/README.md)를 참고하세요.
 P1 확장에서는 상위 FastDyn 통합 테스트로 Rumoca FMI 3 packaging과 실제 Co-Simulation stepping을 검증합니다.
 RBC 연결과 실제 firmware/비행 검증은 해당 테스트 범위 밖입니다.
+
+`plant`와 `vio` 생성 모델 모두 공통 기체를 `plant` 컴포넌트로 포함합니다. `plant` 프로파일은
+환경 입력과 truth·measurements·합산 wrench 진단을 전달하며 내부 hub wrench를 외부 입력으로 노출하지 않습니다.
+기체를 수정할 때는 `plant(...)` 아래에 modifier를 지정합니다.
+
+## P3·P4 3상 추진계
+
+P3는 6-step 평균화 인버터, P4는 6개 스위치의 PWM 인버터를 사용합니다. 부동 중성점의 `ThreePhasePM` 모터와 기체 공통 `DCLink`를 공유합니다. 수식·파라미터 정의·coast 정책·configuration·검증 범위는 [추진계 모델링 문서](docs/propulsion_modeling_ko.md)에 정리했습니다. 예제는 `configs/quad_p3.toml`, `quad_p4.toml`, `hex_p3.toml`, `hex_p4.toml`입니다. 회전자 위치를 아는 6-step 모델이며 FOC는 포함하지 않습니다. Rumoca/FastDyn FMI3 실행을 검증한 결과는 아닙니다.

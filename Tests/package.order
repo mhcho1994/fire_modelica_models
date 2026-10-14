@@ -18,6 +18,16 @@ ContactSettlingTakeoff
 ContactDisabled
 ContactWrenchCG
 ContactTiltedLanding
-IdealEscVoltage
+AverageEscVoltage
 VoltagePropulsion
 VoltageMultirotor
+PassiveRL
+ElectromechanicalCoast
+ElectromechanicalLoad
+Support
+ThreePhaseCoast
+ThreePhaseRegeneration
+ThreePhaseAveraging
+ThreePhaseConversion
+SpiSignals
+SpiDisruption

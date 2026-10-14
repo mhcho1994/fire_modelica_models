@@ -142,7 +142,7 @@ pub fn emit(
         "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":2,
         "core_contract":"ned_frd_continuous_v1",
         "frames":{"world":"NED","body":"FRD","chassis":"FRD","rotor":"local +z thrust","sensor":"local; v_b=R_bs*v_s"},
-        "physics":{"propulsion":if config.voltage_driven() { "P1" } else { "P0" },"rotor_aero":"R0","body":"rigid_6dof","drag":"none",
+        "physics":{"propulsion":config.propulsion_level(),"rotor_aero":"R0","body":"rigid_6dof","drag":"none",
                    "contact":if ground_contact { "four_point_spring_damper" } else { "none" },
                    "sensors":"ideal_with_fixed_bias","acquisition":"continuous"},
         "schema_version":config.schema_version,"profile":profile,"model":config.model_name,
@@ -161,13 +161,49 @@ pub fn emit(
             "input_unit":"us", "output_unit":"1", "acquisition":"continuous",
             "normalization":"clamp((pulseWidth_us-pwmMin)/(pwmMax-pwmMin),0,1)",
             "pwm_min_us":config.interface["pwm_min"], "pwm_max_us":config.interface["pwm_max"],
-            "plant_input":if config.voltage_driven() { "plant.escCommand" } else { "plant.demand" },
-            "plant_mapping":if config.voltage_driven() { "linear_voltage_modulation" } else { "linear_target_speed_ratio" }
+            "propulsion_input":"escs.escCommand",
+            "mapping_owner":"composer.geometry.actuatorIndex",
+            "command_meaning":if config.three_phase() { "high_side_pwm_duty" } else if config.voltage_driven() { "linear_voltage_modulation" } else { "linear_target_speed_ratio" }
         });
     }
-    manifest_value["propulsion_contract"] = if config.voltage_driven() {
+    if config.electromechanical() && !config.three_phase() {
+        manifest_value["event_requirements"]["motor_current_zero_crossing"] = json!(true);
+    }
+    if config.three_phase() {
+        manifest_value["event_requirements"]["six_step_commutation"] = json!(true);
+        manifest_value["event_requirements"]["diode_conduction"] = json!(true);
+        manifest_value["event_requirements"]["coast_release"] = json!(true);
+        manifest_value["event_requirements"]["pwm_switching"] = json!(config.switching());
+    }
+    manifest_value["propulsion_contract"] = if config.three_phase() {
+        json!({"command":"esc_command_v1", "control_mode":"forward_six_step_voltage_modulation",
+            "mapping":"clamp(normalizedCommand,0,1)", "electrical":"three_phase_abc_floating_star_v1",
+            "supply":"shared_resistive_source_and_capacitive_dc_link", "source_can_absorb_energy":true,
+            "dcVoltage_V":config.power["dcVoltage"], "power_accounting":true,
+            "load_feedback":true,"speed_states_per_rotor":1,"current_states_per_rotor":2,
+            "shaft_angle":"theta_e=polePairs*theta_m+theta0", "rotor_position":"ideal_known",
+            "drive":if config.switching() {"six_switch_asynchronous_high_side_pwm"} else {"ccm_mean_asynchronous_high_side_pwm"},
+            "cutoff":"latched_sink_recirculation_then_hi_z", "regeneration":"body_diode_paths_remain_connected",
+            "spin_reaction":"axial_fixed_carrier", "carrier_rotation_feedback":false,
+            "gyroscopic_coupling":false,"current_limiting":false,"thermal_dynamics":false,
+            "pwm_ripple":config.switching(),"pwm_cycle_discontinuous_conduction":config.switching(),
+            "switch_transition_energy":false, "parameter_basis":"per-phase R and effective L; ke is phase peak V per mechanical rad/s",
+            "average_validity":"P3 is a CCM approximation; compare matched PWM-period means away from commutation"})
+    } else if config.electromechanical() {
         json!({"command":"esc_command_v1", "control_mode":"unipolar_voltage_modulation",
-               "mapping":"clamp(escCommand,0,1)", "voltage":"equivalent_voltage_command_v1",
+            "mapping":"clamp(normalizedCommand,0,1)", "electrical":"conserving_pins_with_open_circuit_voltage_v1",
+            "supply":if profile == "vio" { "internal_constant" } else { "input_default" },
+            "dcVoltage_V":config.power["dcVoltage"], "power_accounting":true,
+            "load_feedback":true, "speed_states_per_rotor":1, "current_states_per_rotor":1,
+            "shaft_angle":"MSL kinematic angle; no angle-dependent physics",
+            "drive":"nonregenerative_average", "cutoff":"positive_current_decay_then_open_circuit_coast",
+            "spin_reaction":"axial_fixed_carrier", "carrier_rotation_feedback":false,
+            "gyroscopic_coupling":false, "current_limiting":false, "thermal_dynamics":false,
+            "pwm_ripple":false, "pwm_cycle_discontinuous_conduction":false,
+            "parameter_basis":"DC-equivalent SI; k is both torque and back-EMF constant"})
+    } else if config.voltage_driven() {
+        json!({"command":"esc_command_v1", "control_mode":"unipolar_voltage_modulation",
+               "mapping":"clamp(normalizedCommand,0,1)", "voltage":"equivalent_voltage_command_v1",
                "supply":if profile == "vio" { "internal_constant" } else { "input_default" }, "dcVoltage_V":config.power["dcVoltage"],
                "speed_gain_unit":"(rad/s)/V", "power_accounting":false,
                "load_feedback":false, "speed_states_per_rotor":1})
@@ -175,6 +211,13 @@ pub fn emit(
         json!({"command":"speed_command_v1", "power_accounting":false,
                "load_feedback":false, "speed_states_per_rotor":1})
     };
+    manifest_value["propulsion_components"] = json!({
+        "esc": config.esc_class(),
+        "motor": config.motor_class(),
+        "rotor": "fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
+        "vehicle": "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors",
+        "vehicle_input": "rotor-local hub force and moment"
+    });
     if let Some(prior) = previous {
         if ["config_sha256", "generated_model_sha256", "profile"]
             .iter()

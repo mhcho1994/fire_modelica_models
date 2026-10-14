@@ -16,8 +16,11 @@ fields must already use the new frames. Schema 1/2 must be migrated with the tra
 in `docs/architecture.md`; changing only the schema number is insufficient.
 
 `acquisition="continuous"` is optional and is the only supported value.
-`[models]` may select `rotor="speed_driven"` (default P0), `rotor="voltage_driven"` (P1),
-and `response="ideal"` for each sensor.
+`[models]` selects `esc`, `motor`, and `rotor` separately, plus `response="ideal"` for each sensor.
+P0 defaults are `pass_through`, `first_order_speed`, `quadratic_blade`. P1 uses
+`average_voltage`, `first_order_voltage_to_speed`, `quadratic_blade`. P2 uses
+`average_unidirectional`, `dynamic_dc_equivalent`, `quadratic_blade`. Incompatible ESC/motor
+signal types are rejected. Rotor `kT/kQ` belong in `[rotor]`, separate from `[motor]`.
 Other response profiles, legacy `[ground]` / `geometry.nLegs` settings, sample periods
 and acquisition timestamps are deprecated. Static aggregate or assembled mass budgets remain supported.
 Mass `componentId` values (and arm `componentIds`) remain configuration metadata.
@@ -40,16 +43,20 @@ The manifest records the chosen contact profile and required ground-contact even
 `[interface]` accepts pwm_min, pwm_max, lat0, lon0, ground_alt_wgs84, earth_radius_m.
 Atmospheric pressure and temperature are constant in this minimum profile.
 
-`plant` exposes P0 target-speed `demand[N]` or P1 modulation `escCommand[N]` and
-`dcVoltage` (an input with a configured default, not an internal source at this boundary).
-`--profile vio` adds the flat PWM/sensor boundary and binds P1 supply internally.
-Both P0 and P1 extend `Adapters.VirtualIO.CopterInterface`; its shared `PwmInput` returns
-`normalizedCommand`. The composer explicitly binds that to `plant.demand` or
-`plant.escCommand`. `[interface] pwm_min/pwm_max` defaults to 1100/1900 us for both.
+`plant` exposes `normalizedCommand[N]` for all combinations and P1/P2 `dcVoltage`
+(an input with a configured default). `--profile vio` adds the flat PWM/sensor boundary
+and binds P1/P2 supply internally. All VIO compositions extend `Exports.FMU.CopterInterface`.
+The composer maps its shared PWM adapter's `normalizedCommand` channels through
+`geometry.actuatorIndex` to separate ESC instances, then connects motors, blades and
+one common `MultirotorWithSensors`. The vehicle consumes rotor-local hub wrenches;
+it owns no ESC, motor or blade. `[interface] pwm_min/pwm_max` defaults to 1100/1900 us.
 Legacy `--profile fastdyn` is accepted but emits canonical `profile="vio"` and identical
 source. Manifest `input_adapter` records calibration, continuous normalization and
-`plant_mapping`; `plant` profile has no PWM adapter metadata. Only the CLI alias is retained:
-Modelica packages `Adapters.FastDyn` and `Adapters.VIO` are removed. Use `Adapters.VirtualIO`.
+`command_meaning` and `propulsion_input`; `plant` profile has no PWM adapter metadata. Only the CLI alias is retained:
+Modelica packages `Adapters.FastDyn` and `Adapters.VIO` are removed. Value conversion lives in
+`Adapters.VirtualIO`; copter IO and diagnostics live in `Exports.FMU`. The former standalone
+`MultirotorValueAdapter`/`MultirotorFmu` are removed; use generated models for FMI probes.
+The composer binds constant plant pressure/temperature directly; the export classes own no environment supply.
 Regeneration replaces the staged library so obsolete package directories are removed.
 For embedded physics, use `--config-table FMU.models.quad.physics` (TOML dotted-key syntax).
 Other host tables are untouched. Their physics schema 1/2 is also rejected.
@@ -68,7 +75,9 @@ for actual FMI 2.0 CS generation/stepping. Neither proves Rumoca/FastDyn firmwar
 schema_version = 3
 model_name = "ConfiguredP1"
 [models]
-rotor = "voltage_driven"
+esc = "average_voltage"
+motor = "first_order_voltage_to_speed"
+rotor = "quadratic_blade"
 [power]
 dcVoltage = 16.0
 [motor]
@@ -77,13 +86,90 @@ tauOmega = 0.03 # s
 ```
 
 `power.dcVoltage` is a required finite nonnegative scalar for P1. `motor.Kv` is
-required and positive; `tauOmega` is positive. `Kv`, `tauOmega`, `kT`, `kQ` and
-`omega_start` may be scalar or length nRotors; initial speed is nonnegative.
+required and positive; `tauOmega` is positive. Motor `Kv`, `tauOmega`, `omega_start` and
+rotor `kT/kQ` may be scalar or length nRotors; initial speed is nonnegative.
 P1 has no `omegaMax` speed cap. P0 rejects `[power]` and P1 motor fields; P1 rejects
-P0 motor fields. This is an additive schema-3 extension, with existing P0 defaults retained.
+P0 motor fields. Schema 3 retains P0 numerical defaults, but old integrated rotor selectors must be migrated.
+Replace `models.rotor="speed_driven"/"voltage_driven"` with the three explicit selections,
+move `[motor] kT/kQ` to `[rotor]`, and regenerate source/FMU artifacts.
 
 The manifest records `physics.propulsion`, command contract, unipolar voltage-modulation
 mode, input-default/internal-constant supply policy, SI speed gain, one speed state per
 rotor, and absence of current/power/load feedback. These contracts document the bounded
 composer's selection; they do not claim arbitrary RBC semantic matching.
 Use `configs/quad_p1.toml` / `hex_p1.toml` for complete examples.
+
+The `plant` and `vio` generated models both contain a `plant` component. The `plant` profile
+forwards environmental inputs and exposes truth, measurements and wrench diagnostics;
+computed hub wrenches stay inside the composition. Custom vehicle modifiers belong under `plant(...)`.
+
+## P2 electromechanical propulsion
+
+P2 selects `average_unidirectional` + `dynamic_dc_equivalent` + `quadratic_blade`.
+Use `configs/quad_p2.toml` or `configs/hex_p2.toml`; their parameters are illustrative,
+not calibrated motor/ESC data. P0/P1 remain empirical speed responses.
+
+`Physical.Electrical.Passives.SeriesRL` composes MSL resistor and inductor with
+bidirectional pins. `Physical.Mechanical.Rotational.RigidShaft` composes inertia and
+viscous friction. `Systems.Propulsion.Motors.DynamicDCEquivalent` connects these
+through MSL `RotationalEMF`. Its current and speed obey:
+
+```text
+L*der(i) = Vm - R*i - k*omega
+(J + JLoad)*der(omega) = k*i - b*omega - loadTorque
+loadTorque = kQ*omega^2
+```
+
+Explicit positive `motor.R` [ohm], `L` [H], `k` [N.m/A = V.s/rad] and `J` [kg.m2]
+are required, together with explicit nonnegative `rotor.J` and `power.dcVoltage`.
+`motor.b`, `i_start`, `omega_start` default to zero and must be nonnegative for P2.
+Motor/rotor fields accept scalars or length-nRotors arrays. `rotor.J` is routed to
+motor `JLoad`, not the aerodynamic blade. No physical motor defaults are guessed.
+`k` uses one consistent DC-equivalent SI basis; a P1 fitted `Kv` or BLDC phase
+constant must not be copied without converting/identifying the equivalent circuit.
+There is no empirical time constant or speed cap in P2.
+
+The nonregenerative ESC uses average modulation. At zero command, existing positive
+inductor current circulates at zero terminal voltage until reaching zero. Only then
+does the output block and float to back-EMF; no reverse current/active braking is
+allowed. A positive command below back-EMF also remains blocked once current is zero.
+The ESC's `coast` signal connects to motor `currentZero`: only at that natural
+zero-current event does the motor project its actual inductor state to zero. It does
+not reset current at command cutoff. `openCircuitVoltage=motors.backEMF` gives the
+blocked terminal voltage while retaining a fixed current state. This avoids the
+index-changing ideal-diode/inductor open circuit. These two auxiliary signals accompany
+the conserving electrical pins; SeriesRL itself contains no unilateral constraint.
+
+The ideal converter reports `dcCurrent=modulation*motorCurrent` in powered conduction,
+and zero supply current in freewheel/coast. Public P2 diagnostics in both profiles are
+`motorCurrent`, `dcCurrent`, `electromagneticTorque`, `loadTorque`, `electricalPower`,
+`copperLoss`, `frictionLoss`, `loadPower`, and `storedEnergy` (per-rotor arrays).
+`electricalPower = copperLoss + frictionLoss + loadPower + der(storedEnergy)` includes
+both magnetic and rotational stored energy. Heat is accounted as a loss, without a
+thermal state. A kinematic shaft angle may also be retained by the Modelica compiler.
+
+`HubReaction` adds `-spinSign*(J+JLoad)*der(omega)` to the blade's aerodynamic moment.
+The vehicle applies the mount rotation and CG moment arm once; do not also add a motor
+housing reaction. This is a fixed-carrier axial approximation: carrier angular
+acceleration feedback and gyroscopic coupling are excluded. Physical motor/propeller
+mass belongs once in the vehicle mass budget; relative spin inertia is counted once
+on the shaft. P2 does not add PWM ripple, phase commutation, PWM-cycle discontinuous
+conduction, saturation, current limiting, battery/SOC, thermal dynamics or new aerodynamics.
+
+Run `Examples.QuadElectromechanicalCoast` to inspect hover, cutoff and restart.
+`python3 tools/probe_p2_export.py` builds and steps quad/hexa FMI2 models and compares
+0.1 ms and 0.05 ms steps against native DASSL. Choose the simulation step with respect
+to `L/R`; the example convergence result does not certify arbitrary parameter sets.
+
+P2 native/FMI2 verification and the current Rumoca FMI3 compilation limitation
+are recorded in [validation](../../docs/validation.md#p2-electromechanical-validation-2026-10-12).
+
+## Three-phase P3/P4
+
+Select `average_three_phase` or `switching_three_phase` with `three_phase_pm`.
+The `[esc]` table holds bridge/PWM parameters; `[motor]` uses per-phase
+`RPhase`, `LPhase`, `ke`, and `polePairs`, not P2 equivalents.
+Both profiles require `power.sourceResistance` and `power.dcLinkCapacitance`
+for one shared DC link. See [equations and configuration](../../docs/propulsion_modeling.md).
+The VIO pulse-width adapter remains continuous; P4's internal PWM carrier is independent.
+Emission records switching/event requirements but does not certify FMI support.

@@ -17,6 +17,9 @@ pub struct ResolvedFireConfig {
     pub mass: Table,
     pub motor: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
+    pub esc: Table,
+    pub rotor: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
     pub power: Table,
     pub landing_gear: Table,
     pub initial: Table,
@@ -28,7 +31,67 @@ pub struct ResolvedFireConfig {
 
 impl ResolvedFireConfig {
     pub fn voltage_driven(&self) -> bool {
-        self.models.get("rotor").and_then(Value::as_str) == Some("voltage_driven")
+        self.models.get("motor").and_then(Value::as_str) != Some("first_order_speed")
+    }
+
+    pub fn electromechanical(&self) -> bool {
+        matches!(
+            self.models.get("motor").and_then(Value::as_str),
+            Some("dynamic_dc_equivalent" | "three_phase_pm")
+        )
+    }
+
+    pub fn three_phase(&self) -> bool {
+        self.models.get("motor").and_then(Value::as_str) == Some("three_phase_pm")
+    }
+
+    pub fn switching(&self) -> bool {
+        self.models.get("esc").and_then(Value::as_str) == Some("switching_three_phase")
+    }
+
+    pub fn propulsion_level(&self) -> &'static str {
+        if self.switching() {
+            "P4"
+        } else if self.three_phase() {
+            "P3"
+        } else if self.electromechanical() {
+            "P2"
+        } else if self.voltage_driven() {
+            "P1"
+        } else {
+            "P0"
+        }
+    }
+
+    pub fn esc_class(&self) -> &'static str {
+        match self.models["esc"].as_str().unwrap() {
+            "switching_three_phase" => {
+                "fire_modelica_models.Physical.Electrical.Drives.ESC.SwitchingThreePhase"
+            }
+            "average_three_phase" => {
+                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageThreePhase"
+            }
+            "average_unidirectional" => {
+                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageUnidirectional"
+            }
+            "average_voltage" => {
+                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageVoltage"
+            }
+            _ => "fire_modelica_models.Physical.Electrical.Drives.ESC.PassThrough",
+        }
+    }
+
+    pub fn motor_class(&self) -> &'static str {
+        match self.models["motor"].as_str().unwrap() {
+            "three_phase_pm" => "fire_modelica_models.Systems.Propulsion.Motors.ThreePhasePM",
+            "dynamic_dc_equivalent" => {
+                "fire_modelica_models.Systems.Propulsion.Motors.DynamicDCEquivalent"
+            }
+            "first_order_voltage_to_speed" => {
+                "fire_modelica_models.Systems.Propulsion.Motors.FirstOrderVoltageToSpeed"
+            }
+            _ => "fire_modelica_models.Systems.Propulsion.Motors.FirstOrderSpeed",
+        }
     }
 }
 
@@ -494,6 +557,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         "geometry",
         "mass",
         "motor",
+        "esc",
+        "rotor",
         "power",
         "landing_gear",
         "initial",
@@ -531,19 +596,51 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let m = mass(&section(root, "mass"), &g)?;
     let nr = g["nRotors"].as_integer().unwrap() as usize;
     let models = resolve_models(&section(root, "models"))?;
-    let voltage_driven = models.get("rotor").and_then(Value::as_str) == Some("voltage_driven");
-    let motor = resolve_motor(&section(root, "motor"), nr, voltage_driven)?;
+    let motor_model = models["motor"].as_str().unwrap();
+    let voltage_driven = motor_model != "first_order_speed";
+    let p2 = motor_model == "dynamic_dc_equivalent";
+    let three_phase = motor_model == "three_phase_pm";
+    let switching = models["esc"].as_str() == Some("switching_three_phase");
+    let motor = if three_phase {
+        resolve_three_phase_motor(&section(root, "motor"), nr)?
+    } else if p2 {
+        resolve_p2_motor(&section(root, "motor"), nr)?
+    } else {
+        resolve_motor(&section(root, "motor"), nr, voltage_driven)?
+    };
+    let esc = if three_phase {
+        resolve_three_phase_esc(&section(root, "esc"), nr, switching)?
+    } else {
+        if root.contains_key("esc") {
+            return Err("esc parameter table requires a three-phase ESC".into());
+        }
+        Table::new()
+    };
+    let rotor = resolve_rotor(&section(root, "rotor"), nr, p2 || three_phase)?;
     let power = if voltage_driven {
         let raw = section(root, "power");
-        let t = table(&raw, &["dcVoltage"], "power")?;
+        let keys: &[&str] = if three_phase {
+            &["dcVoltage", "sourceResistance", "dcLinkCapacitance"]
+        } else {
+            &["dcVoltage"]
+        };
+        let t = table(&raw, keys, "power")?;
+        if three_phase {
+            for key in ["sourceResistance", "dcLinkCapacitance"] {
+                let value = t
+                    .get(key)
+                    .ok_or_else(|| format!("P3/P4 require explicit power.{key}"))?;
+                number(value, &format!("power.{key}"), true, false)?;
+            }
+        }
         let voltage = t
             .get("dcVoltage")
-            .ok_or("P1 requires power.dcVoltage [V]")?;
+            .ok_or("Voltage-driven propulsion requires power.dcVoltage [V]")?;
         number(voltage, "power.dcVoltage", false, true)?;
         t.clone()
     } else {
         if root.contains_key("power") {
-            return Err("power is only supported for models.rotor=voltage_driven (P1)".into());
+            return Err("power requires a compatible voltage-driven ESC/motor combination".into());
         }
         Table::new()
     };
@@ -558,6 +655,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         geometry: g,
         mass: m,
         motor,
+        esc,
+        rotor,
         power,
         landing_gear,
         initial,
@@ -568,21 +667,9 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
 
 fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
     let fields = if voltage_driven {
-        [
-            ("Kv", 1000. / 16.),
-            ("tauOmega", 0.03),
-            ("kT", 1e-5),
-            ("kQ", 1.5e-7),
-            ("omega_start", 0.),
-        ]
+        [("Kv", 1000. / 16.), ("tauOmega", 0.03), ("omega_start", 0.)]
     } else {
-        [
-            ("omegaMax", 1000.),
-            ("tau", 0.03),
-            ("kT", 1e-5),
-            ("kQ", 1.5e-7),
-            ("omega_start", 0.),
-        ]
+        [("omegaMax", 1000.), ("tau", 0.03), ("omega_start", 0.)]
     };
     let t = table(raw, &fields.map(|(k, _)| k), "motor")?;
     if voltage_driven && !t.contains_key("Kv") {
@@ -601,7 +688,7 @@ fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
             number(
                 x,
                 &format!("motor.{k}"),
-                ["omegaMax", "tau", "Kv", "tauOmega", "kT"].contains(&k),
+                ["omegaMax", "tau", "Kv", "tauOmega"].contains(&k),
                 true,
             )?;
         }
@@ -614,6 +701,175 @@ fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
         {
             return Err("motor.omega_start must not exceed omegaMax".into());
         }
+    }
+    Ok(out)
+}
+
+fn resolve_p2_motor(raw: &Value, n: usize) -> Result<Table> {
+    let keys = ["R", "L", "k", "J", "b", "i_start", "omega_start"];
+    let t = table(raw, &keys, "motor")?;
+    let mut out = Table::new();
+    for key in keys {
+        let required = ["R", "L", "k", "J"].contains(&key);
+        let v = match t.get(key) {
+            Some(v) => v.clone(),
+            None if required => return Err(format!("P2 requires explicit motor.{key}")),
+            None => Value::Float(0.),
+        };
+        let v = if v.is_array() {
+            v
+        } else {
+            Value::Array(vec![v; n])
+        };
+        array(&v, &[n], &format!("motor.{key}"))?;
+        for x in v.as_array().unwrap() {
+            number(x, &format!("motor.{key}"), required, true)?;
+        }
+        out.insert(key.into(), v);
+    }
+    Ok(out)
+}
+
+// Scalars expand per rotor; a supplied vector must have exactly n entries.
+fn rotor_vector(value: Value, n: usize, label: &str) -> Result<Value> {
+    let v = if value.is_array() {
+        value
+    } else {
+        Value::Array(vec![value; n])
+    };
+    if v.as_array().is_none_or(|a| a.len() != n) {
+        return Err(format!("{label}: expected {n} entries"));
+    }
+    Ok(v)
+}
+
+fn resolve_three_phase_motor(raw: &Value, n: usize) -> Result<Table> {
+    let keys = [
+        "RPhase",
+        "LPhase",
+        "ke",
+        "polePairs",
+        "J",
+        "b",
+        "theta0",
+        "omega_start",
+        "trapezoidal",
+        "i_start",
+    ];
+    let t = table(raw, &keys, "motor")?;
+    let mut out = Table::new();
+    for key in keys.into_iter().filter(|k| *k != "i_start") {
+        let required = ["RPhase", "LPhase", "ke", "polePairs", "J"].contains(&key);
+        let value = match t.get(key) {
+            Some(v) => v.clone(),
+            None if required => return Err(format!("P3/P4 require explicit motor.{key}")),
+            None if key == "trapezoidal" => Value::Boolean(true),
+            None => Value::Float(0.),
+        };
+        let label = format!("motor.{key}");
+        let v = rotor_vector(value, n, &label)?;
+        for x in v.as_array().unwrap() {
+            match key {
+                "polePairs" => {
+                    integer(x, &label, 1)?;
+                }
+                "trapezoidal" => {
+                    if !x.is_bool() {
+                        return Err(format!("{label}: expected boolean"));
+                    }
+                }
+                _ => {
+                    number(x, &label, required, key != "theta0")?;
+                }
+            }
+        }
+        out.insert(key.into(), v);
+    }
+    let currents = t
+        .get("i_start")
+        .cloned()
+        .unwrap_or_else(|| Value::Array(vec![vec3([0.; 3]); n]));
+    array(&currents, &[n, 3], "motor.i_start")?;
+    for row in currents.as_array().unwrap() {
+        let sum = row
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| number(v, "motor.i_start", false, false).unwrap())
+            .sum::<f64>();
+        if sum.abs() >= 1e-10 {
+            return Err("motor.i_start: each floating-star current triple must sum to zero".into());
+        }
+    }
+    out.insert("i_start".into(), currents);
+    Ok(out)
+}
+
+fn resolve_three_phase_esc(raw: &Value, n: usize, switching: bool) -> Result<Table> {
+    let mut keys = vec!["Ron", "Rdiode", "Vdiode", "Goff", "currentThreshold"];
+    if switching {
+        keys.extend(["pwmFrequency", "deadTime"]);
+    }
+    let t = table(raw, &keys, "esc")?;
+    let mut out = Table::new();
+    for key in keys {
+        let required = ["Ron", "Rdiode", "Vdiode", "pwmFrequency"].contains(&key);
+        let value = match t.get(key) {
+            Some(v) => v.clone(),
+            None if required => return Err(format!("P3/P4 require explicit esc.{key}")),
+            None => Value::Float(match key {
+                "Goff" => 1e-5,
+                "currentThreshold" => 1e-3,
+                _ => 0.,
+            }),
+        };
+        let label = format!("esc.{key}");
+        let v = rotor_vector(value, n, &label)?;
+        for x in v.as_array().unwrap() {
+            number(x, &label, !["Vdiode", "deadTime"].contains(&key), true)?;
+        }
+        out.insert(key.into(), v);
+    }
+    if switching {
+        for i in 0..n {
+            if number(&out["pwmFrequency"][i], "esc.pwmFrequency", true, false)?
+                * number(&out["deadTime"][i], "esc.deadTime", false, true)?
+                >= 0.5
+            {
+                return Err("esc.deadTime must be less than half a PWM period".into());
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn resolve_rotor(raw: &Value, n: usize, p2: bool) -> Result<Table> {
+    let allowed: &[&str] = if p2 {
+        &["kT", "kQ", "J"]
+    } else {
+        &["kT", "kQ"]
+    };
+    let t = table(raw, allowed, "rotor")?;
+    if p2 && !t.contains_key("J") {
+        return Err("P2/P3/P4 require explicit rotor.J".into());
+    }
+    let mut defaults = vec![("kT", 1e-5), ("kQ", 1.5e-7)];
+    if p2 {
+        defaults.push(("J", 0.));
+    }
+    let mut out = Table::new();
+    for (key, default) in defaults {
+        let v = t.get(key).cloned().unwrap_or(Value::Float(default));
+        let v = if v.is_array() {
+            v
+        } else {
+            Value::Array(vec![v; n])
+        };
+        array(&v, &[n], &format!("rotor.{key}"))?;
+        for x in v.as_array().unwrap() {
+            number(x, &format!("rotor.{key}"), false, true)?;
+        }
+        out.insert(key.into(), v);
     }
     Ok(out)
 }
@@ -717,16 +973,64 @@ fn resolve_initial(raw: &Value) -> Result<Table> {
 fn resolve_models(raw: &Value) -> Result<Table> {
     let t = table(
         raw,
-        &["rotor", "imu", "magnetometer", "gnss", "barometer"],
+        &[
+            "esc",
+            "motor",
+            "rotor",
+            "imu",
+            "magnetometer",
+            "gnss",
+            "barometer",
+        ],
         "models",
     )?;
-    if let Some(rotor) = t.get("rotor") {
-        if !matches!(rotor.as_str(), Some("speed_driven" | "voltage_driven")) {
-            return Err(
-                "models.rotor: supported models are speed_driven (P0) and voltage_driven (P1)"
-                    .into(),
-            );
+    let mut out = t.clone();
+    for (key, default, supported) in [
+        (
+            "esc",
+            "pass_through",
+            &[
+                "pass_through",
+                "average_voltage",
+                "average_unidirectional",
+                "average_three_phase",
+                "switching_three_phase",
+            ][..],
+        ),
+        (
+            "motor",
+            "first_order_speed",
+            &[
+                "first_order_speed",
+                "first_order_voltage_to_speed",
+                "dynamic_dc_equivalent",
+                "three_phase_pm",
+            ][..],
+        ),
+        ("rotor", "quadratic_blade", &["quadratic_blade"][..]),
+    ] {
+        let selected = out
+            .entry(key)
+            .or_insert_with(|| Value::String(default.into()));
+        if !selected.as_str().is_some_and(|s| supported.contains(&s)) {
+            return Err(format!(
+                "models.{key}: supported models are {}; select ESC, motor and rotor separately",
+                supported.join(", ")
+            ));
         }
+    }
+    let pair = (out["esc"].as_str().unwrap(), out["motor"].as_str().unwrap());
+    if !matches!(
+        pair,
+        ("pass_through", "first_order_speed")
+            | ("average_voltage", "first_order_voltage_to_speed")
+            | ("average_unidirectional", "dynamic_dc_equivalent")
+            | (
+                "average_three_phase" | "switching_three_phase",
+                "three_phase_pm"
+            )
+    ) {
+        return Err("models: incompatible ESC/motor combination; use pass_through/first_order_speed, average_voltage/first_order_voltage_to_speed, average_unidirectional/dynamic_dc_equivalent, or average_three_phase|switching_three_phase/three_phase_pm".into());
     }
     for key in ["imu", "magnetometer", "gnss", "barometer"] {
         if let Some(raw) = t.get(key) {
@@ -738,7 +1042,7 @@ fn resolve_models(raw: &Value) -> Result<Table> {
             }
         }
     }
-    Ok(t.clone())
+    Ok(out)
 }
 
 fn resolve_interface(raw: &Value) -> Result<Table> {

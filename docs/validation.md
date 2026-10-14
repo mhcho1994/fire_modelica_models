@@ -1,12 +1,16 @@
 # Minimum core validation
 
+The aggregate record default fix below resolves the three historical mass/CG failures.
+The current native suite passes all 30 simulations and all four invalid-configuration checks.
+
 Run from the library root with OpenModelica and Modelica 4.0.0 installed:
 
 ```sh
 omc tools/simulate_landing_gear.mos
 python3 tools/verify.py
-FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p test_composer.py
+FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p 'test_*.py'
 python3 tools/probe_export.py
+python3 tools/probe_p2_export.py
 cargo clippy --locked --offline --manifest-path tools/fire-compose/Cargo.toml --all-targets -- -D warnings
 ```
 
@@ -42,7 +46,7 @@ checks mass and CG; `ChassisMassProperties` checks the full rotated inertia tens
 Duplicate IDs are tested in the composer rather than `ChassisRejectedConfigurations`,
 whose remaining negative cases cover physical validity in Modelica.
 
-`probe_export.py` builds quad/hexa FMI 2.0 CS artifacts, initializes real FMU instances,
+`probe_export.py` composes P0/P1 quad/hexa through `--profile vio`, builds FMI 2.0 CS artifacts, initializes real FMU instances,
 sets all channels, calls doStep/getReal and checks freefall, independent motor response,
 FRD specific-force sign, NED position/velocity and Up-positive altitude/climb rate.
 The 0.1 ms FMI step permits <1 rad/s motor-speed error versus the analytic solution;
@@ -74,17 +78,17 @@ vehicle wrench/contact/sensor behavior. They pass with OpenModelica 1.26.1.
 `Examples.QuadVoltageSag` also simulates successfully: its 16-to-12 V supply change
 reduces speed from 606.42343 to 454.81757 rad/s, a ratio of 0.75.
 
-All 19 composer tests pass with `FIRE_TEST_OMC=1`, including generated P1 quad/hexa
+All 20 composer tests pass with `FIRE_TEST_OMC=1`, including generated P1 quad/hexa
 `plant` and `vio` profiles, independent gains/time constants/initial speeds,
 nontrivial actuator mapping, invalid/cross-profile parameters, and verification-cache
 invalidation when selecting P1. Rust clippy passes with warnings denied.
 
-The complete native suite currently passes 24/27 simulations. The failures are
+At this stage, the complete native suite passed 24/27 simulations. The failures were
 `ChassisMassProperties` (aggregate mass), `ContactWrenchCG` (shifted-CG contact moment)
 and `MultirotorFrames` (shifted-CG hub moment). All three reproduce with the **unchanged
 pre-P1 HEAD `fedff92`** in a separate package copy under the same compiler. They are
-existing failures, not a claim that the entire P0 suite is green. The main verification
-runner stops at these failures, before its separate invalid-chassis checks.
+existing failures; the main verification runner stopped before its separate invalid-chassis
+checks. The aggregate record default fix documented below now resolves all three.
 Artifacts for this run are in `build/p1-verification/`, including `native.log`,
 `prechange-baseline.log` and `p1-report.json`; composer output is in `build/p1-composer-tests.log`.
 
@@ -100,7 +104,7 @@ All four cases pass: P0 quad, nominal P1 quad, half-voltage P1 quad, and P1 hexa
 the source FMU, loads the packaged binary and its own metadata, initializes and calls
 `fmi3DoStep` for 0.08 s with a 0.1 ms step. Checks cover the sole external input `pwm`,
 array shapes, channel mapping, analytical rotor speed (absolute tolerance 1e-3 rad/s),
-finite sensor outputs and the internal DC supply. Logs are in FastDyn's `out/virtualio-fmi3-tests.log`.
+finite sensor outputs and the internal DC supply. Logs are in FastDyn's `out/export-layer-fmi3-tests.log`.
 This test does not run flight-controller firmware or validate battery/current/shaft physics.
 
 A persistent runnable P1 quad artifact can be built from FastDyn with:
@@ -113,36 +117,239 @@ python3 utils/build_fmi3_fmu.py --config configs/copter462_fire_p1.toml --skip-s
 identical external PWM and sensor field names; P1's additional voltage connection is internal.
 
 
-## Shared VirtualIO update validation (2026-10-12)
+## Adapter/export separation validation (2026-10-12)
 
-The active adapter package is now `Adapters.VirtualIO`. Both `Adapters.VIO` and
-`Adapters.FastDyn` are removed, along with the compatibility-only command redeclaration
-and legacy wrapper test. The `vio` profile name and `fastdyn` CLI alias remain.
+`Adapters.VirtualIO` contains only `PwmInput` and `SensorValues`. The two copter IO
+classes moved to `Exports.FMU`; the composer owns plant selection, signal connections
+and constant atmospheric supply. `MultirotorValueAdapter` and `MultirotorFmu` are removed.
+The canonical `vio` profile and legacy `fastdyn` CLI alias are unchanged.
 
-All 19 composer tests pass, including canonical/alias equivalence for P0/P1, shared
-adapter metadata, supply binding and regeneration of an existing staged library.
-The staging test seeds obsolete VIO/FastDyn packages and verifies that regeneration
-removes both. Source manifests also exclude these removed classes.
-`AdapterChannels`, `ContinuousSignals`, `NedFrdContract` and `IdealEscVoltage` use the
-canonical VirtualIO classes. The native suite passes 24/27 with the same three baseline
-failures above; removal of the obsolete legacy test accounts for the reduced case count.
-Current logs: `build/virtualio-verification/native.log` and
-`build/virtualio-composer-tests.log`. Earlier P1 logs retain baseline evidence.
+All 20 composer tests pass with `FIRE_TEST_OMC=1`. They check P0/P1 selection, profile
+alias equivalence, source staging, metadata, supply binding and removal of obsolete
+adapter classes on regeneration. The former eight-channel vehicle test is now run
+against composer-generated P0 and P1 models, checking clipping, independent analytical
+speed responses, rotated IMU/magnetometer output and pressure/temperature conversion.
+`Tests.AdapterChannels` tests the two stateless converters without a vehicle instance.
 
-All four FMI3 cases pass with VirtualIO, including out-of-range PWM clamping, channel
-mapping, analytical speed, sensor outputs, metadata and P1 internal supply. The standalone
-`VirtualIO.MultirotorFmu` also passes the quad/hexa FMI2 export/runtime probe, including
-motor/sensor outputs, settling, takeoff and landing. Its report is in
-`build/virtualio-export-validation/report.json`. Rust clippy passes with warnings denied.
+At this stage, the full native suite passed 24/27 simulations; the same three mass/CG
+failures remained. They are resolved by the aggregate record default fix below. Stage logs: `build/export-layer-native/native.log`
+and `build/export-layer-composer-tests.log`. Rust clippy passes with warnings denied.
+The earlier baseline evidence remains in `build/p1-verification/`.
+
+The rewritten `probe_export.py` passes all four P0/P1 quad/hexa FMI2 cases. It builds
+standard composer-generated models with `pwm`, FRD sensor outputs, Gauss, Celsius,
+geodetic GPS and diagnostic rotor speeds. It verifies freefall, independent speed
+response, geodesy, atmospheric supply, settling, takeoff and landing. The PWM calibration
+comes from the generated manifest. OpenModelica 1.26.1 exposes record-shaped `truth`
+fields as local diagnostic variables; the probe reads their actual value references
+and checks public sensor output causality separately. It retains the documented
+held-input refresh workaround. Report: `build/export-layer-fmi2/report.json`.
+
+All four Rumoca FMI3 tests pass: P0 quad, P1 quad, half-voltage P1 quad and eight-channel
+P1 hexa. They exercise PWM clipping, channel mapping, analytic speed, finite sensor
+outputs and the internal supply; `pwm` remains the only external input. Log:
+FastDyn `out/export-layer-fmi3-tests.log`.
+
 The 13 FastDyn configuration/cache unit tests passed during the preceding common-adapter
-update; the VirtualIO rename preserves those configuration names and paths.
+update; this separation keeps the configuration names and paths. Actual flight-controller
+execution remains unverified. The FastDyn C FMU host still handles four PWM channels;
+the Python FMI3 probe independently verifies the eight-channel/six-rotor artifact.
 
-Actual flight-controller execution remains unverified. The FastDyn C FMU host still
-handles four PWM channels, whereas the Python FMI3 probe is array-aware and tests the
-eight-channel/six-rotor hexa artifact.
-
-Both persistent FastDyn configs were rebuilt successfully after the rename:
+Both persistent configs were rebuilt with the separated export package:
 `configs/copter462_fire_p0.toml` -> `out/fmi3/ConfiguredQuad/ConfiguredQuad.fmu` and
 `configs/copter462_fire_p1.toml` -> `out/fmi3/ConfiguredQuadP1/ConfiguredQuadP1.fmu`.
-Their staged libraries contain only `Adapters/VirtualIO`. Build logs are
-`out/virtualio-p0-build.log` and `out/virtualio-p1-build.log` in FastDyn.
+Staged libraries contain the two value converters under `Adapters/VirtualIO` and both
+copter interfaces under `Exports/FMU`. Build logs are `out/export-layer-p0-build.log`
+and `out/export-layer-p1-build.log` in FastDyn.
+
+
+## Independent ESC / motor / rotor composition (2026-10-12)
+
+The composer now creates separate `escs`, `motors` and `rotors` arrays beside the
+same `Vehicles.Copter.MultirotorWithSensors` for P0/P1. The common vehicle consumes
+rotor-local hub force/moment. Voltage-specific vehicles and integrated rotor classes
+are removed. P0/P1 remain combination labels; TOML selects ESC/motor/rotor separately
+and stores aerodynamic coefficients under `[rotor]`.
+
+- All 23 composer tests pass with `FIRE_TEST_OMC=1`. They include quad/hexa/octo,
+  shared four-channel/eight-rotor coaxial mapping, unequal motor time constants and
+  gains, initial speeds, independent blade coefficients, nominal P0/P1 equivalence,
+  an in-simulation supply step, PWM clipping, sensor mounts and incompatible-pair rejection.
+- Both `plant` combinations also build FMI2 CS FMUs. Tests require public normalized
+  commands (plus P1 voltage) and reject accidental exposure of internally computed hub
+  wrenches. Generated models contain the mechanical `plant` instead of inheriting its
+  input ports. OMC can fold default-bound environmental arrays into constants: this
+  test does not claim every default-bound environmental signal remains a tunable FMU input.
+- The updated `Examples.QuadVoltageSag` also simulates successfully for 2 s.
+- At this stage, native Modelica passed 24/27 simulations. `ChassisMassProperties`,
+  `ContactWrenchCG` and `MultirotorFrames` still failed, so the invalid-chassis checks
+  were not reached. The aggregate record default fix below resolves these failures.
+- The VIO FMI2 probe passes P0/P1 quad/hexa (four cases), including actual stepping,
+  sensor values, contact settling, takeoff and landing.
+- FastDyn Rumoca FMI3 passes P0 quad, P1 quad, half-voltage P1 quad and eight-channel
+  P1 hexa (four cases). PWM remains the only external command input.
+- FastDyn configuration/cache tests pass 13/13. Rust's bounded-reference test and
+  `cargo clippy --all-targets -- -D warnings` pass.
+
+Logs: FIRE `build/component-composer-final.log`, `build/component-native/native.log`,
+`build/component-fmi2/report.json`; FastDyn `out/component-fmi3-tests.log` and
+`out/component-config-tests.log`. The persistent P0/P1 artifacts were rebuilt at
+`out/fmi3/ConfiguredQuad/ConfiguredQuad.fmu` and
+`out/fmi3/ConfiguredQuadP1/ConfiguredQuadP1.fmu`, with logs
+`out/component-p0-build.log` and `out/component-p1-build.log`.
+Actual firmware execution remains outside these verification results.
+
+
+## Aggregate record default fix (2026-10-12)
+
+`ChassisAssembly.aggregate` and `MultirotorPlant.aggregate` now specify defaults as
+field modifications (`aggregate(mass=..., inertia=...)`) instead of a whole-record
+binding (`aggregate = MassProperties(...)`). This permits callers to override only
+mass, CG or inertia while retaining defaults for the other fields. Existing callers
+that supply a complete record, including composer-generated models, remain supported.
+The default values and physics equations are unchanged.
+
+The previous declarations combined a whole-record value binding with callers' nested
+field value modifications. That combination is invalid under Modelica's modification
+merging rules. OpenModelica 1.26.1 retained the whole-record defaults without diagnosing
+the conflict, so the tests detected incorrect mass/CG at initialization. This was a
+parameter-binding problem, not a runtime reset or a change in moment-arm physics.
+See [Modelica 3.6, merging of modifications](https://specification.modelica.org/maint/3.6/inheritance-modification-and-redeclaration.html#merging-of-modifications).
+
+The existing test equations, assertions and tolerances were retained for this fix:
+
+- Native OpenModelica: 27/27 simulations pass with no warnings, including all three
+  previously failing cases. All four invalid-chassis configurations are rejected.
+- `ChassisMassProperties`: aggregate mass is 7 kg and CG is `{4,5,6}` m.
+- `ContactWrenchCG`: vehicle mass is 2 kg and CG is `{0.04,-0.03,0.02}` m.
+- `MultirotorFrames`: CG is `{0.03,-0.02,0.01}` m and the original hub-moment assertion passes.
+- Composer: 23/23 tests pass with `FIRE_TEST_OMC=1`, including generated whole-record
+  configuration bindings and both `plant` FMI2 exports.
+- VIO FMI2: all four P0/P1 quad/hexa cases pass, including motor/sensor outputs,
+  contact settling, takeoff and landing, with the runtime workaround described above.
+- Rumoca FMI3: all four cases pass (P0 quad, P1 quad, half-voltage P1 quad, P1 hexa).
+
+Native results: `build/mass-binding-native/report.json` and `native.log` in the same
+directory. Composer log: `build/mass-binding-composer.log`. FMI2 report:
+`build/mass-binding-fmi2/report.json`. FMI3 log: FastDyn `out/mass-binding-fmi3-tests.log`.
+
+Both persistent FastDyn P0/P1 artifacts were rebuilt with these declarations:
+`out/fmi3/ConfiguredQuad/ConfiguredQuad.fmu` and
+`out/fmi3/ConfiguredQuadP1/ConfiguredQuadP1.fmu`. Build logs are
+`out/mass-binding-p0-build.log` and `out/mass-binding-p1-build.log` in FastDyn.
+
+
+## P2 electromechanical validation (2026-10-12)
+
+The P0/P1 empirical response models retain their existing behavior. P2 composes a
+bidirectional `SeriesRL`, ideal `RotationalEMF`, shaft inertia/friction, a unidirectional
+averaged ESC and the existing quadratic blade with explicit load-torque feedback.
+The motor resets the actual inductor state only on the ESC-reported zero-current
+event; command cutoff does not erase stored magnetic energy.
+
+Verified with OpenModelica 1.26.1 and Modelica 4.0.0:
+
+- Native suite: 30/30 simulations, no warnings, and four expected invalid-chassis
+  rejections. `PassiveRL` checks signed current, analytical RL transients and energy.
+  `ElectromechanicalCoast` checks continuous cutoff current, its freewheel path,
+  blocked low command, open-circuit coast, restart, integrated energy balance and
+  hub reaction. A second motor checks initially rotating zero-current coast with
+  zero supply, analytical viscous decay and bearing reaction.
+  `ElectromechanicalLoad` checks steady torque/speed, aerodynamic-load feedback,
+  increased inertia and inductance-dependent startup current.
+- Composer: 25/25 tests with native simulation enabled. P2 covers required physical
+  parameters, invalid values/arrays/pairings, manifest contracts and quad/hexa
+  `plant` and `vio` compositions with unequal per-rotor parameters and nontrivial
+  channel mapping. P0/P1 regressions remain included.
+- `Examples.QuadElectromechanicalCoast` runs hover, cutoff and restart for 1 s.
+- Quad/hexa FMI 2 Co-Simulation FMUs build and run through powered operation,
+  cutoff, blocked low command, restart and a second cutoff. The probe checks
+  public electrical diagnostics, nonnegative current and zero coast input power.
+  The hexa case maps eight command channels to six rotors. Ground contact is
+  disabled in this electrical-transient probe.
+- Rust unit tests and `cargo clippy --all-targets -- -D warnings` pass.
+
+The FMI2 probe compares eight sample times with native DASSL at tolerance 1e-10.
+The maximum sampled errors decrease by approximately half when the step is halved:
+
+| Vehicle | Step [ms] | Speed error [rad/s] | Current error [A] |
+| --- | ---: | ---: | ---: |
+| Quad | 0.10 | 0.149460 | 0.016299 |
+| Quad | 0.05 | 0.074437 | 0.008124 |
+| Hexa | 0.10 | 0.170979 | 0.020293 |
+| Hexa | 0.05 | 0.085546 | 0.010114 |
+
+These step sizes are evidence for the illustrative parameter sets only. An
+appropriate integration step depends on the electrical time scale `L/R`.
+Reports are in `build/p2-verification/report.json` and
+`build/p2-export-validation/report.json`; composer, Rust and example logs are
+in `build/p2-development/`.
+
+**Rumoca/FastDyn FMI 3 remains unsupported for this P2 implementation.** An actual
+FastDyn build with the staged portable Modelica library currently stops at Rumoca
+`ED001`: 1283 equations versus 1291 unknowns for the quad composition. A standalone
+shaft probe compiles, while a separate SeriesRL export reaches another compiler
+restriction: `FMI C profile: only unscheduled assertions without relation memory
+are supported`. Native OpenModelica and FMI2 accept the same library models;
+this does not establish the root cause of the Rumoca equation imbalance.
+No compiler checks were bypassed, no Rumoca source was modified, and no P2 FMI3
+artifact or firmware execution is claimed. Diagnostic logs are
+`build/p2-development/rumoca-build.log` and
+`build/p2-fastdyn-fmi3/ElectricalProbe.log`. The existing P0/P1 FMI3 validation above
+does not certify P2.
+
+## P3/P4 three-phase propulsion (2026-10-14)
+
+P3 is a known-position six-step averaged inverter and P4 is an asynchronous
+high-side PWM six-switch inverter. Both use the same floating-star three-phase
+PM motor, shaft and shared DC link. These are the six-step profiles documented in
+[propulsion_modeling.md](propulsion_modeling.md), not the future dq/FOC proposal
+in the earlier FastDyn interface document. No Rumoca source was changed.
+
+OpenModelica 1.26.1 / Modelica 4.0.0 native results:
+
+- 34 simulations pass, without warnings, with four expected invalid-chassis
+  rejections. This includes the prior P0/P1/P2 suite.
+- `ThreePhaseConversion` checks phase-peak ke, electrical/mechanical angle,
+  sinusoidal abc torque and lossless conversion power.
+- `ThreePhaseCoast` checks signed currents, retained current after cutoff,
+  recirculation-to-Hi-Z, restart, a nonzero turn-on delay and integrated energy.
+- `ThreePhaseRegeneration` checks initially disabled gates with a spinning motor:
+  body diodes return energy, the bus voltage rises and mechanical energy falls.
+- `ThreePhaseAveraging` checks the P3 locked-shaft electrical equilibrium and
+  P4 CCM means over 40–50 ms at duty 0.6, 10 kHz and zero dead time.
+
+`tools/probe_p34.py` bounds the internal DASSL maximum step, rather than treating
+CSV output interval as a solver step. The PWM ripple is measured during a full
+steady carrier period. Both runs use tolerance 1e-9.
+
+| Quantity | Maximum step 5 µs | Maximum step 2.5 µs |
+|---|---:|---:|
+| P3 mean phase current [A] | 22.528889288 | 22.528889288 |
+| P4 mean phase current [A] | 22.501038066 | 22.501038093 |
+| Mean-current difference [%] | 0.123624 | 0.123624 |
+| P3 mean ESC input power [W] | 212.629207227 | 212.629207226 |
+| P4 mean ESC input power [W] | 212.118393427 | 212.118393915 |
+| Mean-power difference [%] | 0.240237 | 0.240237 |
+| P4 phase-current peak-to-peak ripple [A] | 0.194694829 | 0.194694830 |
+| Maximum integrated energy error [J] | 1.56e-7 | 1.46e-7 |
+
+Mean-current and mean-power comparison tolerances are 1%; step-refinement
+changes must be below 0.1%. Doubling `Goff` from 1e-5 S to 2e-5 S changes the
+mean current and power by less than 0.1% at this benchmark. This sensitivity check
+does not calibrate the leakage to hardware. P3's CCM reduction does not establish
+agreement during PWM-cycle DCM, fast commutation, large bus ripple or every duty.
+
+The four P3/P4 composer tests pass with `FIRE_TEST_OMC=1`, including eight
+native vehicle cases: quad/hexa × P3/P4 × plant/VIO. These cases use the bundled
+20 kHz P4 configuration, unequal command channels, the hexa's 8-to-6 channel
+mapping, a shared bus, integrated energy balance and command cutoff. Ground
+contact is disabled for these electrical-transient cases. Both new single-motor
+examples also simulate successfully without warnings. The complete fast composer
+suite has 29 tests (9 native-only tests skipped when `FIRE_TEST_OMC` is unset).
+The existing native P0/P1/P2 composer regressions were also exercised during development.
+
+Reports: `build/p34-native/report.json`, `build/p34-validation/report.json`.
+Rust unit tests, clippy with warnings denied, package registration and the document's
+TOML example also pass. P3/P4 FMI export, FMI stepping, FastDyn firmware execution,
+and Rumoca support are not claimed by these results.

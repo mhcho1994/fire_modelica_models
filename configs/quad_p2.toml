@@ -1,0 +1,30 @@
+# Illustrative P2/R0 parameters, not calibrated to a real motor/propeller.
+schema_version = 3
+model_name = "ConfiguredQuadP2"
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+[models]
+esc = "average_unidirectional"
+motor = "dynamic_dc_equivalent"
+rotor = "quadratic_blade"
+[motor]
+R = 0.2
+L = 0.001
+k = 0.02
+J = 0.0001
+b = 0.0
+i_start = 0.0
+omega_start = 0.0
+[rotor]
+J = 0.0001
+kT = 0.00001
+kQ = 0.00000015
+[power]
+dcVoltage = 16.0
+[initial]
+p_start = [0.0, 0.0, -0.12]
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0

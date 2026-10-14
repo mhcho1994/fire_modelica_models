@@ -1,5 +1,5 @@
 //! FIRE-specific mapping into the bounded composition representation.
-use crate::composition::{CompositionSpec, Instance, Modifier, Value};
+use crate::composition::{CompositionSpec, Instance, Modifier, Prefix, Value};
 use crate::config::ResolvedFireConfig;
 use crate::Result;
 use toml::map::Map;
@@ -95,14 +95,6 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             )?,
         ));
     }
-    for (k, v) in &c.motor {
-        let name = match k.as_str() {
-            "tau" => "motorTau",
-            "omega_start" => "rotorSpeed_start",
-            other => other,
-        };
-        m.push(Modifier::Bind(name.into(), literal(v)?));
-    }
     m.extend(fields(&c.initial)?);
     m.push(Modifier::Bind(
         "landingGear".into(),
@@ -111,87 +103,336 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             fields(&c.landing_gear)?,
         ),
     ));
-    if c.voltage_driven() {
-        m.push(Modifier::Bind(
-            "dcVoltage".into(),
-            literal(&c.power["dcVoltage"])?,
-        ));
-    }
-    if c.models.contains_key("rotor") {
-        m.push(Modifier::RedeclareModel {
-            name: "RotorUnit".into(),
-            class: if c.voltage_driven() {
-                "fire_modelica_models.Systems.Propulsion.VoltageDrivenRotor"
-            } else {
-                "fire_modelica_models.Systems.Propulsion.SpeedDrivenRotor"
-            }
-            .into(),
-            modifiers: vec![],
-        });
-    }
     Ok(m)
+}
+
+fn instance(class: &str, name: &str, dimensions: Vec<usize>, modifiers: Vec<Modifier>) -> Instance {
+    Instance {
+        class: class.into(),
+        name: name.into(),
+        dimensions,
+        modifiers,
+        prefix: Prefix::Component,
+        binding: None,
+    }
+}
+fn reference(name: &str) -> Value {
+    Value::Reference(name.into())
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
     let profile = crate::canonical_profile(profile)?;
-    let plant_class = if c.voltage_driven() {
-        "fire_modelica_models.Vehicles.Copter.VoltageDrivenMultirotorWithSensors"
+    let vio = profile == "vio";
+    let dynamic = c.electromechanical();
+    let three_phase = c.three_phase();
+    let p2 = dynamic && !three_phase;
+    let mut connections = Vec::new();
+    let nr = c.geometry["nRotors"].as_integer().unwrap() as usize;
+    let nc = c.geometry["nActuators"].as_integer().unwrap() as usize;
+    let plant_class = "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors";
+    let mut physical = plant_modifiers(c)?;
+    let mut components = Vec::new();
+    let (base, modifiers, command) = if vio {
+        physical.insert(0, Modifier::Bind("geometry".into(), reference("geometry")));
+        physical.push(Modifier::Bind("pressure".into(), Value::Real(101325.0)));
+        physical.push(Modifier::Bind("temperature".into(), Value::Real(288.15)));
+        components.push(instance(plant_class, "plant", vec![], physical));
+        let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
+        boundary.extend(fields(&c.interface)?);
+        (
+            Some("fire_modelica_models.Exports.FMU.CopterInterface".into()),
+            boundary,
+            "commands.normalizedCommand",
+        )
     } else {
-        "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors"
+        let mut layout = instance(
+            "fire_modelica_models.Vehicles.Copter.Geometry",
+            "geometry",
+            vec![],
+            vec![],
+        );
+        layout.prefix = Prefix::Parameter;
+        layout.binding = Some(geometry(c)?);
+        components.push(layout);
+        physical.insert(0, Modifier::Bind("geometry".into(), reference("geometry")));
+        // Keep environmental inputs public; internally computed rotor wrenches are not inputs.
+        for (name, class, default) in [
+            (
+                "gravity_w",
+                "Modelica.Units.SI.Acceleration",
+                vec![0., 0., 9.80665],
+            ),
+            ("wind_w", "Modelica.Units.SI.Velocity", vec![0.; 3]),
+            ("externalForce_b", "Modelica.Units.SI.Force", vec![0.; 3]),
+            ("externalMoment_b", "Modelica.Units.SI.Torque", vec![0.; 3]),
+            (
+                "magneticField_w",
+                "Modelica.Units.SI.MagneticFluxDensity",
+                vec![0., 20e-6, 45e-6],
+            ),
+            ("pressure", "Modelica.Units.SI.Pressure", vec![101325.]),
+            ("temperature", "Modelica.Units.SI.Temperature", vec![288.15]),
+        ] {
+            let scalar = default.len() == 1;
+            let dimensions = if scalar { vec![] } else { vec![default.len()] };
+            let mut input = instance(class, name, dimensions, vec![]);
+            input.prefix = Prefix::Input;
+            input.binding = Some(if scalar {
+                Value::Real(default[0])
+            } else {
+                Value::Array(default.into_iter().map(Value::Real).collect())
+            });
+            components.push(input);
+            physical.push(Modifier::Bind(name.into(), reference(name)));
+        }
+        components.push(instance(plant_class, "plant", vec![], physical));
+        for (name, class, dimensions) in [
+            (
+                "truth",
+                "fire_modelica_models.Interfaces.VehicleState",
+                vec![],
+            ),
+            (
+                "measurements",
+                "fire_modelica_models.Interfaces.SensorMeasurements",
+                vec![],
+            ),
+            ("force_b", "Modelica.Units.SI.Force", vec![3]),
+            ("moment_b", "Modelica.Units.SI.Torque", vec![3]),
+        ] {
+            let mut output = instance(class, name, dimensions, vec![]);
+            output.prefix = Prefix::Output;
+            components.push(output);
+        }
+        let mut input = instance(
+            "Modelica.Units.SI.PerUnit",
+            "normalizedCommand",
+            vec![nc],
+            vec![],
+        );
+        input.prefix = Prefix::Input;
+        components.push(input);
+        let mut speed = instance(
+            "Modelica.Units.SI.AngularVelocity",
+            "rotorSpeed",
+            vec![nr],
+            vec![],
+        );
+        speed.prefix = Prefix::Output;
+        components.push(speed);
+        (None, vec![], "normalizedCommand")
     };
-    let mut modifiers = plant_modifiers(c)?;
-    match profile {
-        "plant" => {
-            modifiers.insert(0, Modifier::Bind("geometry".into(), geometry(c)?));
-            Ok(CompositionSpec {
-                name: c.model_name.clone(),
-                base: plant_class.into(),
-                modifiers,
-                components: vec![],
-                equalities: vec![],
-            })
-        }
-        "vio" => {
-            modifiers.push(Modifier::Bind(
-                "pressure".into(),
-                Value::Reference("ambientPressure".into()),
-            ));
-            modifiers.push(Modifier::Bind(
-                "temperature".into(),
-                Value::Reference("ambientTemperature".into()),
-            ));
-            modifiers.insert(
-                0,
-                Modifier::Bind("geometry".into(), Value::Reference("geometry".into())),
-            );
-            let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
-            boundary.extend(fields(&c.interface)?);
-            Ok(CompositionSpec {
-                name: c.model_name.clone(),
-                base: "fire_modelica_models.Adapters.VirtualIO.CopterInterface".into(),
-                modifiers: boundary,
-                components: vec![Instance {
-                    class: plant_class.into(),
-                    name: "plant".into(),
-                    modifiers,
-                }],
-                equalities: [
-                    if c.voltage_driven() {
-                        ("plant.escCommand", "commands.normalizedCommand")
-                    } else {
-                        ("plant.demand", "commands.normalizedCommand")
-                    },
-                    ("values.measurements", "plant.measurements"),
-                    ("truth", "plant.truth"),
-                    ("rotorSpeed", "plant.rotors.rotorSpeed"),
-                ]
-                .into_iter()
-                .map(|(a, b)| (a.into(), b.into()))
-                .collect(),
-            })
-        }
-        _ => Err(format!(
-            "unsupported profile {profile}; expected plant or vio"
-        )),
+    components.push(instance(c.esc_class(), "escs", vec![nr], fields(&c.esc)?));
+    let mut motor_fields = fields(&c.motor)?;
+    if dynamic {
+        motor_fields.push(Modifier::Bind("JLoad".into(), literal(&c.rotor["J"])?));
     }
+    components.push(instance(c.motor_class(), "motors", vec![nr], motor_fields));
+    let mut rotor_fields = c.rotor.clone();
+    rotor_fields.remove("J");
+    let mut blades = fields(&rotor_fields)?;
+    blades.push(Modifier::Bind(
+        "spinSign".into(),
+        reference("geometry.spinSign"),
+    ));
+    components.push(instance(
+        "fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
+        "rotors",
+        vec![nr],
+        blades,
+    ));
+    let mapped = c.geometry["actuatorIndex"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| reference(&format!("{command}[{}]", i.as_integer().unwrap())))
+        .collect();
+    let mut equalities = vec![
+        ("escs.escCommand".into(), Value::Array(mapped)),
+        ("rotors.omega".into(), reference("motors.omega")),
+        ("rotorSpeed".into(), reference("motors.omega")),
+        (
+            "rotors.airVelocity_r".into(),
+            reference("plant.rotorAirVelocity_r"),
+        ),
+        (
+            "rotors.omegaBody_r".into(),
+            reference("plant.rotorOmegaBody_r"),
+        ),
+        ("plant.rotorForce_r".into(), reference("rotors.force_r")),
+        (
+            "plant.rotorMoment_r".into(),
+            reference(if dynamic {
+                "reactions.moment_r"
+            } else {
+                "rotors.moment_r"
+            }),
+        ),
+    ];
+    if c.voltage_driven() {
+        let mut voltage = instance("Modelica.Units.SI.Voltage", "dcVoltage", vec![], vec![]);
+        voltage.prefix = if vio {
+            Prefix::Parameter
+        } else {
+            Prefix::Input
+        };
+        voltage.binding = Some(literal(&c.power["dcVoltage"])?);
+        components.push(voltage);
+        if !three_phase {
+            equalities.push((
+                "escs.dcVoltage".into(),
+                Value::Array(vec![reference("dcVoltage"); nr]),
+            ));
+        }
+        if !dynamic {
+            equalities.push((
+                "motors.equivalentVoltage".into(),
+                reference("escs.equivalentVoltage"),
+            ));
+        }
+    } else {
+        equalities.push(("motors.demand".into(), reference("escs.normalizedCommand")));
+    }
+    if dynamic {
+        components.push(instance(
+            "fire_modelica_models.Systems.Propulsion.HubReaction",
+            "reactions",
+            vec![nr],
+            vec![
+                Modifier::Bind("J".into(), literal(&c.motor["J"])?),
+                Modifier::Bind("JLoad".into(), literal(&c.rotor["J"])?),
+                Modifier::Bind("spinSign".into(), reference("geometry.spinSign")),
+            ],
+        ));
+        if p2 {
+            connections.push(("escs.p".into(), "motors.p".into()));
+            connections.push(("escs.n".into(), "motors.n".into()));
+            equalities.extend([
+                ("motors.currentZero".into(), reference("escs.coast")),
+                (
+                    "escs.openCircuitVoltage".into(),
+                    reference("motors.backEMF"),
+                ),
+            ]);
+            let mut current = instance(
+                "Modelica.Units.SI.Current",
+                "motorCurrent",
+                vec![nr],
+                vec![],
+            );
+            current.prefix = Prefix::Output;
+            components.push(current);
+            equalities.push(("motorCurrent".into(), reference("motors.current")));
+        }
+        equalities.extend([
+            ("motors.loadTorque".into(), reference("rotors.loadTorque")),
+            (
+                "reactions.aerodynamicMoment_r".into(),
+                reference("rotors.moment_r"),
+            ),
+            (
+                "reactions.acceleration".into(),
+                reference("motors.acceleration"),
+            ),
+        ]);
+        for (name, class, source) in [
+            ("dcCurrent", "Current", "escs.dcCurrent"),
+            (
+                "electromagneticTorque",
+                "Torque",
+                "motors.electromagneticTorque",
+            ),
+            ("loadTorque", "Torque", "rotors.loadTorque"),
+            ("electricalPower", "Power", "escs.electricalPower"),
+            ("copperLoss", "Power", "motors.copperLoss"),
+            ("frictionLoss", "Power", "motors.frictionLoss"),
+            ("loadPower", "Power", "motors.loadPower"),
+            ("storedEnergy", "Energy", "motors.storedEnergy"),
+        ] {
+            let mut diagnostic = instance(
+                &format!("Modelica.Units.SI.{class}"),
+                name,
+                vec![nr],
+                vec![],
+            );
+            diagnostic.prefix = Prefix::Output;
+            components.push(diagnostic);
+            equalities.push((name.into(), reference(source)));
+        }
+    }
+    if three_phase {
+        components.push(instance(
+            "fire_modelica_models.Systems.Power.DCLink",
+            "bus",
+            vec![],
+            vec![
+                Modifier::Bind(
+                    "sourceResistance".into(),
+                    literal(&c.power["sourceResistance"])?,
+                ),
+                Modifier::Bind(
+                    "dcLinkCapacitance".into(),
+                    literal(&c.power["dcLinkCapacitance"])?,
+                ),
+                Modifier::Bind("voltage_start".into(), literal(&c.power["dcVoltage"])?),
+            ],
+        ));
+        equalities.push(("bus.sourceVoltage".into(), reference("dcVoltage")));
+        equalities.push((
+            "escs.electricalAngle".into(),
+            reference("motors.electricalAngle"),
+        ));
+        for i in 1..=nr {
+            connections.push(("bus.p".into(), format!("escs[{i}].dc_p")));
+            connections.push(("bus.n".into(), format!("escs[{i}].dc_n")));
+            connections.push((format!("escs[{i}].phase"), format!("motors[{i}].phase")));
+        }
+        for (name, class, dims, source) in [
+            (
+                "phaseCurrent",
+                "Current",
+                vec![nr, 3],
+                "motors.phaseCurrent",
+            ),
+            ("backEMF", "Voltage", vec![nr, 3], "motors.backEMF"),
+            (
+                "electricalAngle",
+                "Angle",
+                vec![nr],
+                "motors.electricalAngle",
+            ),
+            ("escLoss", "Power", vec![nr], "escs.lossPower"),
+            ("busVoltage", "Voltage", vec![], "bus.voltage"),
+            ("totalDcCurrent", "Current", vec![], "bus.loadCurrent"),
+            ("sourceCurrent", "Current", vec![], "bus.sourceCurrent"),
+            ("sourcePower", "Power", vec![], "bus.sourcePower"),
+            ("busLoss", "Power", vec![], "bus.lossPower"),
+            ("busStoredEnergy", "Energy", vec![], "bus.storedEnergy"),
+        ] {
+            let mut diagnostic =
+                instance(&format!("Modelica.Units.SI.{class}"), name, dims, vec![]);
+            diagnostic.prefix = Prefix::Output;
+            components.push(diagnostic);
+            equalities.push((name.into(), reference(source)));
+        }
+    }
+    if vio {
+        equalities.push((
+            "values.measurements".into(),
+            reference("plant.measurements"),
+        ));
+    } else {
+        for name in ["measurements", "force_b", "moment_b"] {
+            equalities.push((name.into(), reference(&format!("plant.{name}"))));
+        }
+    }
+    equalities.push(("truth".into(), reference("plant.truth")));
+    Ok(CompositionSpec {
+        name: c.model_name.clone(),
+        base,
+        modifiers,
+        components,
+        equalities,
+        connections,
+    })
 }

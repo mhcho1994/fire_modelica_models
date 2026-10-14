@@ -16,6 +16,7 @@ inertia = [[0.04, -0.002, 0.0], [-0.002, 0.045, 0.0], [0.0, 0.0, 0.075]]
 [motor]
 Kv = [62.5, 62.5, 62.5, 62.5, 62.5, 62.5] # (rad/s)/V
 tauOmega = 0.035
+[rotor]
 kT = 0.00001
 kQ = 0.00000015
 
@@ -31,7 +32,9 @@ tangentialDamping = 25.0
 frictionCoefficient = 0.6
 
 [models]
-rotor = "voltage_driven"
+esc = "average_voltage"
+motor = "first_order_voltage_to_speed"
+rotor = "quadratic_blade"
 
 [power]
 dcVoltage = 16.0 # Ideal fixed supply; no battery current/SOC model.

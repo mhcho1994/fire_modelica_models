@@ -8,7 +8,8 @@ model ContactWrenchCG "Contact moment is about the combined CG, with ground heig
     p_start={0,0,1.2-0.08+weight/12000},
     externalMoment_b={0.03*weight,0.04*weight,0});
 equation
-  vehicle.demand=zeros(4);
+  vehicle.rotorForce_r=zeros(vehicle.geometry.nRotors,3);
+  vehicle.rotorMoment_r=zeros(vehicle.geometry.nRotors,3);
   assert(max(abs(vehicle.gear.force_b-{0,0,-weight}))<1e-5,"NED contact force must point up and equal weight");
   assert(max(abs(vehicle.gear.moment_b-{-0.03*weight,-0.04*weight,0}))<1e-5,
     "Contact torque must include the CG shift exactly once");

@@ -1,4 +1,4 @@
 within fire_modelica_models.Adapters;
-package VirtualIO "Virtual I/O value adapters, independent of propulsion fidelity"
+package VirtualIO "Host value and SPI request adapters; no vehicle or FMU assembly"
   extends Modelica.Icons.Package;
 end VirtualIO;

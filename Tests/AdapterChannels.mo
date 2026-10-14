@@ -1,16 +1,24 @@
 within fire_modelica_models.Tests;
-model AdapterChannels "Eight independent PWM channels, clipping and value frame conversions"
-  Adapters.VirtualIO.MultirotorValueAdapter adapter(geometry=Vehicles.Copter.Presets.OctoX(
-      R_bImu=[0,-1,0;1,0,0;0,0,1],R_bMag=diagonal({1,-1,-1})),
-    landingGear(enabled=false),vehicle(gravity_w=zeros(3),p_start={1,2,10}));
+model AdapterChannels "Stateless eight-channel PWM clipping and sensor mount transformations"
+  Adapters.VirtualIO.PwmInput commands(nChannels=8);
+  Adapters.VirtualIO.SensorValues values(geometry=Vehicles.Copter.Presets.OctoX(
+    R_bImu=[0,-1,0;1,0,0;0,0,1],R_bMag=diagonal({1,-1,-1})));
 equation
-  adapter.pwm_us={900,1100,1200,1300,1400,1500,1600,2100};
-  when time>=0.3 then
-    assert(max(abs(adapter.commands.normalizedCommand-{0,0.1,0.2,0.3,0.4,0.5,0.6,1}))<1e-12,"PWM channels must not be trimmed or truncated");
-    assert(max(abs(adapter.rotorSpeed-1000*(1-exp(-time/0.03))*{0,0.1,0.2,0.3,0.4,0.5,0.6,1}))<0.01,"All eight motor channels must respond independently");
-    assert(max(abs(adapter.position_ned-adapter.vehicle.measurements.position))<1e-12,"NED position must pass through without a second frame conversion");
-    assert(max(abs(adapter.acceleration_frd-{-adapter.vehicle.measurements.acceleration[2],adapter.vehicle.measurements.acceleration[1],adapter.vehicle.measurements.acceleration[3]}))<1e-12,"Sensor to body FRD conversion failed");
-    assert(max(abs(adapter.magneticField_frd-diagonal({1,-1,-1})*adapter.vehicle.measurements.magneticField))<1e-12,"Magnetometer mount conversion failed");
-  end when;
-  annotation(experiment(StopTime=0.31,Tolerance=1e-8,Interval=0.001));
+  commands.pulseWidth_us={900,1100,1200,1300,1400,1500,1600,2100};
+  values.measurements.acceleration={1,2,3};
+  values.measurements.gyro={4,5,6};
+  values.measurements.magneticField={1e-5,2e-5,3e-5};
+  values.measurements.position={time,2*time,-3*time};
+  values.measurements.velocity={1,2,-3};
+  values.measurements.pressure=101325;
+  values.measurements.temperature=288.15;
+  values.measurements.altitude=3*time;
+  values.measurements.climbRate=3;
+  assert(max(abs(commands.normalizedCommand-{0,0.1,0.2,0.3,0.4,0.5,0.6,1}))<1e-12,"PWM channels must not be trimmed or truncated");
+  assert(max(abs(values.acceleration_frd-{-2,1,3}))<1e-12,"IMU mount conversion failed");
+  assert(max(abs(values.gyro_frd-{-5,4,6}))<1e-12,"Gyro mount conversion failed");
+  assert(max(abs(values.magneticField_frd-{1e-5,-2e-5,-3e-5}))<1e-12,"Magnetometer mount conversion failed");
+  assert(max(abs(values.position_ned-{time,2*time,-3*time}))<1e-12,"NED position must pass through continuously");
+  assert(max(abs(values.velocity_ned-{1,2,-3}))<1e-12,"NED velocity must not be converted twice");
+  annotation(experiment(StopTime=0.035,Tolerance=1e-9,Interval=0.0007));
 end AdapterChannels;

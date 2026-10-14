@@ -24,6 +24,7 @@ inertia = [[0.0005, 0.0, 0.0], [0.0, 0.0007, 0.0], [0.0, 0.0, 0.0005]]
 [motor]
 omegaMax = 1100.0
 tau = 0.03
+[rotor]
 kT = 0.00001
 kQ = 0.00000015
 
@@ -37,3 +38,8 @@ stiffness = 3000.0
 damping = 150.0
 tangentialDamping = 25.0
 frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"

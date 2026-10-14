@@ -1,1 +1,6 @@
-IdealVoltage
+PassThrough
+AverageVoltage
+AverageUnidirectional
+PartialThreePhase
+AverageThreePhase
+SwitchingThreePhase

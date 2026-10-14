@@ -1,0 +1,34 @@
+within fire_modelica_models.Physical.Electrical.Drives.ESC;
+partial model PartialThreePhase "Shared three-phase power ports, six-step policy and diagnostics"
+  parameter Modelica.Units.SI.Resistance Ron;
+  parameter Modelica.Units.SI.Resistance Rdiode;
+  parameter Modelica.Units.SI.Voltage Vdiode;
+  parameter Modelica.Units.SI.Conductance Goff = 1e-5;
+  parameter Modelica.Units.SI.Current currentThreshold = 1e-3;
+  Modelica.Electrical.Analog.Interfaces.PositivePin dc_p;
+  Modelica.Electrical.Analog.Interfaces.NegativePin dc_n;
+  Modelica.Electrical.Analog.Interfaces.PositivePin phase[3];
+  input Real escCommand;
+  input Modelica.Units.SI.Angle electricalAngle;
+  output Modelica.Units.SI.Current phaseCurrent[3];
+  output Modelica.Units.SI.Current dcCurrent;
+  output Modelica.Units.SI.Voltage dcVoltage;
+  output Modelica.Units.SI.Power electricalPower;
+  output Modelica.Units.SI.Power motorPower;
+  output Modelica.Units.SI.Power lossPower;
+  output Boolean coast;
+  output Boolean recirculating;
+  Physical.Electrical.Drives.Control.SixStep control(currentThreshold=currentThreshold);
+equation
+  phaseCurrent = -phase.i;
+  control.command = escCommand;
+  control.electricalAngle = electricalAngle;
+  control.phaseCurrent = phaseCurrent;
+  coast = control.coast;
+  recirculating = control.recirculating;
+  dcCurrent = dc_p.i;
+  dcVoltage = dc_p.v-dc_n.v;
+  electricalPower = dcVoltage*dcCurrent;
+  motorPower = sum({(phase[j].v-dc_n.v)*phaseCurrent[j] for j in 1:3});
+  lossPower = electricalPower-motorPower;
+end PartialThreePhase;

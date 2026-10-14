@@ -1,18 +1,27 @@
 within fire_modelica_models.Examples;
 
 model QuadImuOnly "Direct IMU composition for a sensor experiment, without SensorSuite"
-  Vehicles.Copter.MultirotorPlant vehicle(
-    rotorSpeed_start={sqrt(vehicle.chassis.mass*9.80665/
-      (vehicle.geometry.nRotors*vehicle.kT[i])) for i in 1:vehicle.geometry.nRotors});
+  Vehicles.Copter.MultirotorPlant vehicle;
   Systems.Sensing.IMU.Sensor imu(
     r_b=vehicle.geometry.imuPosition_C-vehicle.chassis.cg_C,
     R_bs=vehicle.geometry.R_bImu);
   output Real acceleration[3] "Specific force in IMU axes [m/s2]";
   output Real gyro[3] "Angular velocity in IMU axes [rad/s]";
   output Interfaces.VehicleState truth;
+  Physical.Electrical.Drives.ESC.PassThrough escs[vehicle.geometry.nRotors];
+  Systems.Propulsion.Motors.FirstOrderSpeed motors[vehicle.geometry.nRotors](each omegaMax=1000,each tau=0.03,
+    omega_start={sqrt(vehicle.chassis.mass*9.80665/(vehicle.geometry.nRotors*rotors[i].kT)) for i in 1:vehicle.geometry.nRotors});
+  Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade rotors[vehicle.geometry.nRotors](
+    each kT=1e-5,each kQ=1.5e-7,spinSign=vehicle.geometry.spinSign);
 equation
-  vehicle.demand={vehicle.rotorSpeed_start[i]/vehicle.omegaMax[i]
-    for i in 1:vehicle.geometry.nActuators};
+  rotors.omega=motors.omega;
+  rotors.airVelocity_r=vehicle.rotorAirVelocity_r;
+  rotors.omegaBody_r=vehicle.rotorOmegaBody_r;
+  vehicle.rotorForce_r=rotors.force_r;
+  vehicle.rotorMoment_r=rotors.moment_r;
+  motors.demand=escs.normalizedCommand;
+  escs.escCommand={motors[i].omega_start/motors[i].omegaMax
+    for i in 1:vehicle.geometry.nRotors};
   imu.R_wb=vehicle.body.R_wb;
   imu.a_w=vehicle.body.a_w;
   imu.gravity_w=vehicle.gravity_w;

@@ -8,6 +8,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import zipfile
+import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -155,9 +157,15 @@ class RustComposerTests(unittest.TestCase):
                 package = adapters / obsolete
                 package.mkdir()
                 (package / 'package.mo').write_text(f'package {obsolete} end {obsolete};')
+            removed_classes = ('CopterInterface', 'PartialCopterInterface',
+                               'MultirotorValueAdapter', 'MultirotorFmu')
+            for name in removed_classes:
+                (adapters / 'VirtualIO' / f'{name}.mo').write_text(f'model {name} end {name};')
             repeat = self.run_config(raw, 'emit', '--profile', 'vio', '--output-dir', str(output))
             self.assertEqual(repeat.returncode, 0, repeat.stderr)
             self.assertFalse(stale.exists())
+            for name in removed_classes:
+                self.assertFalse((adapters / 'VirtualIO' / f'{name}.mo').exists())
             for obsolete in ('VIO', 'FastDyn'):
                 self.assertFalse((adapters / obsolete).exists())
             manifest = json.loads((output / 'TestHexa.manifest.json').read_text())
@@ -179,16 +187,23 @@ class RustComposerTests(unittest.TestCase):
                     adapter = manifest['input_adapter']
                     self.assertEqual(adapter['class'], 'fire_modelica_models.Adapters.VirtualIO.PwmInput')
                     self.assertEqual(adapter['output_contract'], 'normalized_pwm_command_v1')
-                    self.assertEqual(adapter['plant_mapping'], mapping)
-                    self.assertEqual(adapter['plant_input'], f'plant.{port}')
+                    self.assertEqual(adapter['command_meaning'], mapping)
+                    self.assertEqual(adapter['propulsion_input'], 'escs.escCommand')
                     self.assertEqual((adapter['pwm_min_us'], adapter['pwm_max_us']), (1100, 1900))
-                    self.assertIn('extends fire_modelica_models.Adapters.VirtualIO.CopterInterface', source)
-                    self.assertIn(f'plant.{port} = commands.normalizedCommand', source)
+                    self.assertIn('extends fire_modelica_models.Exports.FMU.CopterInterface', source)
+                    self.assertIn('escs.escCommand = {commands.normalizedCommand[3],commands.normalizedCommand[2],commands.normalizedCommand[4],commands.normalizedCommand[1]}', source)
                     self.assertNotIn('Adapters.FastDyn', source)
                     if port == 'escCommand':
                         self.assertEqual(manifest['propulsion_contract']['supply'], 'internal_constant')
                     adapters = output / 'sources/fire_modelica_models/Adapters'
                     self.assertTrue((adapters / 'VirtualIO/package.mo').is_file())
+                    self.assertEqual({p.stem for p in (adapters / 'VirtualIO').glob('*.mo')},
+                                     {'package', 'PwmInput', 'SensorValues'})
+                    exports = output / 'sources/fire_modelica_models/Exports/FMU'
+                    self.assertTrue((exports / 'CopterInterface.mo').is_file())
+                    self.assertNotIn('ambientPressure', (exports / 'PartialCopterInterface.mo').read_text())
+                    self.assertIn('pressure=101325', source)
+                    self.assertIn('temperature=288.15', source)
                     for obsolete in ('VIO', 'FastDyn'):
                         self.assertFalse((adapters / obsolete).exists())
                         self.assertFalse(any(path.startswith(f'Adapters/{obsolete}/')
@@ -422,6 +437,46 @@ end GroundRun;
                 for key in ['gps[1]','gps[2]','gps[3]','accel[3]','baro_pressure_pa']:
                     self.assertTrue(math.isfinite(float(last[key])),key)
 
+    @unittest.skipUnless(os.environ.get('FIRE_TEST_OMC') == '1', 'set FIRE_TEST_OMC=1')
+    def test_composed_eight_channel_adapter_and_sensor_mounts(self):
+        for motor_model in ('first_order_speed', 'first_order_voltage_to_speed'):
+            with self.subTest(motor=motor_model), tempfile.TemporaryDirectory() as work:
+                work = Path(work)
+                esc_model = 'average_voltage' if motor_model == 'first_order_voltage_to_speed' else 'pass_through'
+                raw = ('schema_version=3\nmodel_name="ChannelsVehicle"\n'
+                       '[geometry]\npreset="OctoX"\n'
+                       '[initial]\np_start=[1,2,-10]\n'
+                       '[landing_gear]\nenabled=false\n'
+                       '[interface]\npwm_min=1000\npwm_max=2000\n'
+                       f'[models]\nesc="{esc_model}"\nmotor="{motor_model}"\nrotor="quadratic_blade"\n')
+                if motor_model == 'first_order_voltage_to_speed':
+                    raw += '[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
+                run = self.run_config(raw, 'emit', '--profile', 'vio', '--output-dir', str(work/'generated'))
+                self.assertEqual(run.returncode, 0, run.stderr)
+                harness = work/'ChannelsRun.mo'
+                harness.write_text('''model ChannelsRun
+  extends ChannelsVehicle(geometry(R_bImu=[0,-1,0;1,0,0;0,0,1],R_bMag=diagonal({1,-1,-1})),
+    plant(gravity_w=zeros(3)),pwm={900,1100,1200,1300,1400,1500,1600,2100});
+equation
+  when time>=0.3 then
+    assert(max(abs(commands.normalizedCommand-{0,0.1,0.2,0.3,0.4,0.5,0.6,1}))<1e-12,"PWM channel clipping changed");
+    assert(max(abs(rotorSpeed-1000*(1-exp(-time/0.03))*{0,0.1,0.2,0.3,0.4,0.5,0.6,1}))<0.01,"Eight independent speed responses changed");
+    assert(max(abs(values.position_ned-plant.measurements.position))<1e-12,"NED position changed");
+    assert(max(abs(accel-{-plant.measurements.acceleration[2],plant.measurements.acceleration[1],plant.measurements.acceleration[3]}))<1e-12,"IMU mount conversion changed");
+    assert(max(abs(mag-10000*diagonal({1,-1,-1})*plant.measurements.magneticField))<1e-12,"Mag mount/Gauss conversion changed");
+    assert(abs(baro_pressure_pa-101325)<1e-8 and abs(baro_temperature_c-15)<1e-8,"Plant atmospheric supply changed");
+  end when;
+end ChannelsRun;
+''')
+                files = [work/'generated/sources/fire_modelica_models/package.mo',
+                         work/'generated/ChannelsVehicle.mo', harness]
+                script = work/'simulate.mos'
+                script.write_text('loadModel(Modelica,{"4.0.0"});\n'
+                    + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
+                    + 'simulate(ChannelsRun,stopTime=0.31,tolerance=1e-9);\ngetErrorString();\n')
+                run = subprocess.run(['omc', str(script)], cwd=work, text=True, capture_output=True, timeout=120)
+                self.assertIn('The simulation finished successfully', run.stdout, run.stdout+run.stderr)
+
     def test_p1_contracts_and_supply_are_explicit(self):
         for config in ('quad_p1.toml', 'hex_p1.toml'):
             for profile in ('plant', 'vio'):
@@ -438,17 +493,25 @@ end GroundRun;
                     self.assertFalse(contract['power_accounting'])
                     self.assertNotIn('omegaMax', manifest['config']['motor'])
                     source = next(Path(work).glob('*.mo')).read_text()
-                    self.assertIn('VoltageDrivenMultirotorWithSensors', source)
-                    self.assertIn('dcVoltage=16', source)
+                    self.assertIn('Vehicles.Copter.MultirotorWithSensors', source)
+                    self.assertNotIn('VoltageDrivenMultirotor', source)
+                    self.assertIn('ESC.AverageVoltage escs[', source)
+                    self.assertIn('Motors.FirstOrderVoltageToSpeed motors[', source)
+                    self.assertIn('Blades.QuadraticBlade rotors[', source)
+                    self.assertEqual(manifest['config']['power']['dcVoltage'], 16)
                     self.assertNotIn('commands.demand', source)
                     if profile == 'vio':
-                        self.assertIn('plant.escCommand = commands.normalizedCommand', source)
-                        self.assertIn('Adapters.VirtualIO.CopterInterface', source)
-                    self.assertTrue((Path(work) / 'sources/fire_modelica_models/Physical/Electrical/Drives/ESC/IdealVoltage.mo').is_file())
+                        self.assertIn('escs.escCommand = {commands.normalizedCommand[', source)
+                        self.assertIn('plant.rotorForce_r = rotors.force_r', source)
+                        self.assertIn('Exports.FMU.CopterInterface', source)
+                    self.assertTrue((Path(work) / 'sources/fire_modelica_models/Physical/Electrical/Drives/ESC/AverageVoltage.mo').is_file())
 
     def test_p1_rejects_missing_and_cross_profile_parameters(self):
-        raw = 'schema_version=3\n[models]\nrotor="voltage_driven"\n[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
-        cases = [raw.replace('Kv=62.5', ''), raw.replace('[power]\ndcVoltage=16', ''),
+        raw = 'schema_version=3\n[models]\nesc="average_voltage"\nmotor="first_order_voltage_to_speed"\nrotor="quadratic_blade"\n[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
+        cases = [raw.replace('average_voltage', 'pass_through'),
+                 raw.replace('first_order_voltage_to_speed', 'first_order_speed'),
+                 raw.replace('rotor="quadratic_blade"', 'rotor="voltage_driven"'),
+                 raw.replace('Kv=62.5', ''), raw.replace('[power]\ndcVoltage=16', ''),
                  raw.replace('Kv=62.5', 'omegaMax=1000'),
                  raw.replace('Kv=62.5', 'Kv=62.5\ntau=0.03'),
                  raw.replace('Kv=62.5', 'Kv=0'), raw.replace('Kv=62.5', 'Kv=nan'),
@@ -483,7 +546,7 @@ end GroundRun;
             self.assertEqual(manifest['propulsion_contract']['command'], 'speed_command_v1')
             manifest['verification']['fmu_simulation'] = 'passed'
             path.write_text(json.dumps(manifest))
-            p1 = p0 + '[models]\nrotor="voltage_driven"\n[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
+            p1 = p0 + '[models]\nesc="average_voltage"\nmotor="first_order_voltage_to_speed"\nrotor="quadratic_blade"\n[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
             run = self.run_config(p1, 'emit', '--profile', 'vio', '--output-dir', work)
             self.assertEqual(run.returncode, 0, run.stderr)
             manifest = json.loads(path.read_text())
@@ -502,14 +565,14 @@ end GroundRun;
                     work = Path(work)
                     raw = ('schema_version=3\nmodel_name="P1Vehicle"\n'
                            f'[geometry]\npreset="{preset}"\nnActuators={channels}\nactuatorIndex={mapping}\n'
-                           '[models]\nrotor="voltage_driven"\n'
+                           '[models]\nesc="average_voltage"\nmotor="first_order_voltage_to_speed"\nrotor="quadratic_blade"\n'
                            f'[motor]\nKv={gains}\ntauOmega={taus}\nomega_start={starts}\n'
                            '[power]\ndcVoltage=8\n[landing_gear]\nenabled=false\n')
                     run = self.run_config(raw, 'emit', '--profile', profile, '--output-dir', str(work/'generated'))
                     self.assertEqual(run.returncode, 0, run.stderr)
                     command = [0.1*(i+1) for i in range(channels)]
                     values = [1100+800*u for u in command] if profile == 'vio' else command
-                    port = 'pwm' if profile == 'vio' else 'escCommand'
+                    port = 'pwm' if profile == 'vio' else 'normalizedCommand'
                     harness = work/'P1Run.mo'
                     harness.write_text('model P1Run\n  P1Vehicle vehicle('+port+'={'+','.join(map(str,values))+'});\nend P1Run;\n')
                     files = [work/'generated/sources/fire_modelica_models/package.mo', work/'generated/P1Vehicle.mo', harness]
@@ -524,5 +587,115 @@ end GroundRun;
                     for i, channel in enumerate(mapping):
                         target = gains[i]*8*command[channel-1]
                         expected = target+(starts[i]-target)*math.exp(-0.08/taus[i])
-                        key = f'vehicle.rotorSpeed[{i+1}]' if profile == 'vio' else f'vehicle.rotors[{i+1}].rotorSpeed'
+                        key = f'vehicle.rotorSpeed[{i+1}]'
                         self.assertAlmostEqual(float(final[key]),expected,delta=1e-4)
+
+    def test_rotor_parameters_are_independent_of_motor_response(self):
+        raw = 'schema_version=3\n[rotor]\nkT=[0,1e-5,2e-5,3e-5]\nkQ=0\n'
+        run = self.run_config(raw, 'validate', '--json')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        resolved = json.loads(run.stdout)
+        self.assertNotIn('kT', resolved['motor'])
+        self.assertEqual(resolved['rotor']['kQ'], [0]*4)
+        for invalid in (raw.replace('kQ=0', 'kQ=-1'),
+                        raw.replace('kQ=0', 'kQ=nan'),
+                        raw.replace('kQ=0', 'kQ=[1,2]'),
+                        'schema_version=3\n[motor]\nkT=1e-5',
+                        'schema_version=3\n[models]\nesc="unknown"'):
+            with self.subTest(raw=invalid), tempfile.TemporaryDirectory() as work:
+                output = Path(work)/'generated'
+                run = self.run_config(invalid, 'emit', '--output-dir', str(output))
+                self.assertNotEqual(run.returncode, 0)
+                self.assertFalse(output.exists())
+
+    @unittest.skipUnless(os.environ.get('FIRE_TEST_OMC') == '1', 'set FIRE_TEST_OMC=1')
+    def test_composed_coaxial_shared_channels_and_supply_step(self):
+        # Four commands drive eight independent motors with unequal response/aero parameters.
+        mapping = [1,2,3,4,1,2,3,4]
+        command = [0.1,0.2,0.3,0.4]
+        gains = [50+5*i for i in range(8)]
+        taus = [0.02+0.003*i for i in range(8)]
+        starts = [10*(i+1) for i in range(8)]
+        thrust = [1e-5*(i+1) for i in range(8)]
+        torque = [1e-7*(i+1) for i in range(8)]
+        common = (f'[geometry]\npreset="CoaxialX8"\nnActuators=4\nactuatorIndex={mapping}\n'
+                  '[landing_gear]\nenabled=false\n'
+                  f'[rotor]\nkT={thrust}\nkQ={torque}\n')
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            for p1 in (False, True):
+                name = 'SupplyP1' if p1 else 'SupplyP0'
+                raw = f'schema_version=3\nmodel_name="{name}"\n'+common
+                raw += f'[motor]\nomega_start={starts}\n'
+                if p1:
+                    raw += (f'Kv={gains}\ntauOmega={taus}\n[power]\ndcVoltage=8\n'
+                            '[models]\nesc="average_voltage"\nmotor="first_order_voltage_to_speed"\n')
+                else:
+                    raw += f'omegaMax={[8*g for g in gains]}\ntau={taus}\n'
+                run = self.run_config(raw, 'emit', '--profile', 'plant', '--output-dir', str(work/'generated'))
+                self.assertEqual(run.returncode, 0, run.stderr)
+            harness = work/'SupplyRun.mo'
+            harness.write_text("""model SupplyRun
+  SupplyP0 p0(normalizedCommand={0.1,0.2,0.3,0.4});
+  SupplyP1 p1(normalizedCommand={0.1,0.2,0.3,0.4},dcVoltage=if time<0.06 then 8 else 4);
+equation
+  when time>=0.05 then
+    assert(max(abs(p0.rotorSpeed-p1.rotorSpeed))<1e-6,"Nominal independent motors must agree");
+    assert(max(abs(p0.force_b-p1.force_b))<1e-6,"Nominal common vehicle force must agree");
+    assert(max(abs(p0.moment_b-p1.moment_b))<1e-6,"Nominal hub/CG torque must agree");
+  end when;
+end SupplyRun;
+""")
+            files = [work/'generated/sources/fire_modelica_models/package.mo',
+                     work/'generated/SupplyP0.mo', work/'generated/SupplyP1.mo', harness]
+            script = work/'simulate.mos'
+            script.write_text('loadModel(Modelica,{"4.0.0"});\n'
+                + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
+                + 'simulate(SupplyRun,stopTime=0.12,tolerance=1e-10,outputFormat="csv");\ngetErrorString();\n')
+            run = subprocess.run(['omc',str(script)],cwd=work,text=True,capture_output=True,timeout=120)
+            self.assertIn('The simulation finished successfully',run.stdout,run.stdout+run.stderr)
+            with (work/'SupplyRun_res.csv').open() as stream:
+                final = list(csv.DictReader(stream))[-1]
+            for i, channel in enumerate(mapping):
+                target = gains[i]*8*command[channel-1]
+                p0 = target+(starts[i]-target)*math.exp(-0.12/taus[i])
+                at_step = target+(starts[i]-target)*math.exp(-0.06/taus[i])
+                p1 = target/2+(at_step-target/2)*math.exp(-0.06/taus[i])
+                for name, expected in [('p0',p0),('p1',p1)]:
+                    self.assertAlmostEqual(float(final[f'{name}.rotorSpeed[{i+1}]']),expected,delta=1e-4)
+                    self.assertAlmostEqual(float(final[f'{name}.rotors[{i+1}].force_r[3]']),
+                                           thrust[i]*expected**2,delta=1e-5)
+                    spin = (1 if i%2==0 else -1)*(1 if i<4 else -1)
+                    self.assertAlmostEqual(float(final[f'{name}.rotors[{i+1}].moment_r[3]']),
+                                           -spin*torque[i]*expected**2,delta=1e-6)
+
+    @unittest.skipUnless(os.environ.get('FIRE_TEST_OMC') == '1', 'set FIRE_TEST_OMC=1')
+    def test_plant_fmu_keeps_internal_wrenches_out_of_inputs(self):
+        for config in ('quad.toml', 'quad_p1.toml'):
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as work:
+                work = Path(work)
+                run = self.run_config((ROOT/'configs'/config).read_text(), 'emit',
+                                      '--profile', 'plant', '--output-dir', str(work/'generated'))
+                self.assertEqual(run.returncode, 0, run.stderr)
+                model_file = next((work/'generated').glob('*.mo'))
+                files = [work/'generated/sources/fire_modelica_models/package.mo', model_file]
+                script = work/'export.mos'
+                script.write_text('loadModel(Modelica,{"4.0.0"});\n'
+                    + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
+                    + f'buildModelFMU({model_file.stem},version="2.0",fmuType="cs",platforms={{"static"}});\ngetErrorString();\n')
+                run = subprocess.run(['omc',str(script)],cwd=work,text=True,capture_output=True,timeout=120)
+                fmu = work/(model_file.stem+'.fmu')
+                self.assertTrue(fmu.is_file(),run.stdout+run.stderr)
+                with zipfile.ZipFile(fmu) as archive:
+                    model = ET.fromstring(archive.read('modelDescription.xml'))
+                inputs = {v.get('name').split('[')[0] for v in model.find('ModelVariables')
+                          if v.get('causality') == 'input'}
+                expected = {'normalizedCommand','gravity_w','wind_w','externalForce_b',
+                            'externalMoment_b','magneticField_w','pressure','temperature'}
+                if config == 'quad_p1.toml':
+                    expected.add('dcVoltage')
+                # OMC may fold default-bound environmental arrays into constants;
+                # command inputs must remain public and computed hub wrenches must not.
+                self.assertTrue(inputs <= expected, inputs-expected)
+                self.assertIn('normalizedCommand', inputs)
+                self.assertEqual('dcVoltage' in inputs, config == 'quad_p1.toml')

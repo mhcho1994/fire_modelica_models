@@ -1,0 +1,41 @@
+# Illustrative per-phase parameters, not calibrated hardware data.
+# P3/R0: known-position six-step commutation, forward command + coast.
+schema_version = 3
+model_name = "ConfiguredHexP3"
+[geometry]
+preset = "HexaX"
+nActuators = 8
+actuatorIndex = [1, 2, 3, 4, 6, 8]
+[models]
+esc = "average_three_phase"
+motor = "three_phase_pm"
+rotor = "quadratic_blade"
+[motor]
+RPhase = 0.2
+LPhase = 0.001
+ke = 0.01
+polePairs = 7
+trapezoidal = true
+J = 0.0001
+b = 0.0
+theta0 = 0.0
+omega_start = 0.0
+[esc]
+Ron = 0.005
+Rdiode = 0.005
+Vdiode = 0.5
+Goff = 1e-5
+currentThreshold = 0.001
+[rotor]
+J = 0.0001
+kT = 0.00001
+kQ = 0.00000015
+[power]
+dcVoltage = 16.0
+sourceResistance = 0.02
+dcLinkCapacitance = 0.002
+[initial]
+p_start = [0.0, 0.0, -0.12]
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0

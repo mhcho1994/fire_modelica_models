@@ -1,6 +1,2 @@
-ResponseModels
-PartialRotorUnit
-PartialSpeedDrivenRotor
-SpeedDrivenRotor
-PartialVoltageDrivenRotor
-VoltageDrivenRotor
+Motors
+HubReaction

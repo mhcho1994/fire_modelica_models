@@ -1,4 +1,4 @@
 within fire_modelica_models.Physical.Electrical.Drives;
-package ESC "Electronic speed controller profiles"
+package ESC "Command, average-voltage and nonregenerative power drive models"
   extends Modelica.Icons.Package;
 end ESC;

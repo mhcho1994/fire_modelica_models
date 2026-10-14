@@ -4,7 +4,8 @@ model ContactDisabled "Disabling landing gear preserves freefall through the gro
   Vehicles.Copter.MultirotorWithSensors vehicle(
     landingGear(enabled=false),p_start={0,0,-0.12});
 equation
-  vehicle.demand=zeros(vehicle.geometry.nActuators);
+  vehicle.rotorForce_r=zeros(vehicle.geometry.nRotors,3);
+  vehicle.rotorMoment_r=zeros(vehicle.geometry.nRotors,3);
   assert(max(abs(vehicle.gear.force_b))+max(abs(vehicle.gear.moment_b))<1e-12,
     "Disabled landing gear must contribute no wrench");
   assert(max(abs(vehicle.measurements.acceleration))<1e-9,"Freefall accelerometer must read zero");

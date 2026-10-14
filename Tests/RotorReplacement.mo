@@ -1,13 +1,16 @@
 within fire_modelica_models.Tests;
-model RotorReplacement "Replaceable rotor array preserves common speed-profile parameters"
+model RotorReplacement "Independent rotor replacement preserves the vehicle hub-wrench boundary"
   model ReducedThrustRotor
-    extends Systems.Propulsion.SpeedDrivenRotor(blade(kT=0.5*kT));
+    extends Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade(kT=0.5e-5);
   end ReducedThrustRotor;
-  Vehicles.Copter.MultirotorPlant vehicle(
-    redeclare model RotorUnit=ReducedThrustRotor,
-    rotorSpeed_start=fill(100,4),gravity_w=zeros(3));
+  Vehicles.Copter.MultirotorPlant vehicle(gravity_w=zeros(3));
+  ReducedThrustRotor rotors[vehicle.geometry.nRotors](spinSign=vehicle.geometry.spinSign);
 equation
-  vehicle.demand=fill(0.1,4);
-  assert(abs(vehicle.force_b[3]+0.2)<1e-10,"Redeclared rotor array did not use replacement blade coefficient");
+  rotors.omega=fill(100,vehicle.geometry.nRotors);
+  rotors.airVelocity_r=vehicle.rotorAirVelocity_r;
+  rotors.omegaBody_r=vehicle.rotorOmegaBody_r;
+  vehicle.rotorForce_r=rotors.force_r;
+  vehicle.rotorMoment_r=rotors.moment_r;
+  assert(abs(vehicle.force_b[3]+0.2)<1e-10,"Replacement blade coefficient did not reach the common vehicle");
   annotation(experiment(StopTime=0.05,Tolerance=1e-9,Interval=0.001));
 end RotorReplacement;

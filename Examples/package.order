@@ -5,3 +5,7 @@ OctoHover
 CoaxialHover
 QuadGroundCycle
 QuadVoltageSag
+QuadElectromechanicalCoast
+ThreePhaseCoast
+SwitchedThreePhaseCoast
+SpiTransfer

@@ -21,6 +21,7 @@ initial equation
   assert(max(abs(vehicle.sensors.rGnss_b-{-0.1,0,0.15}))<1e-12,"GNSS mount not rebased");
   assert(max(abs(vehicle.sensors.rBarometer_b-{-0.1,0,0.07}))<1e-12,"Barometer mount not rebased");
 equation
-  vehicle.demand=zeros(vehicle.geometry.nActuators);
+  vehicle.rotorForce_r=zeros(vehicle.geometry.nRotors,3);
+  vehicle.rotorMoment_r=zeros(vehicle.geometry.nRotors,3);
   annotation(experiment(StopTime=0.05,Tolerance=1e-9,Interval=0.001));
 end MultirotorPayload;

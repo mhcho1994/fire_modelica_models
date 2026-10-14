@@ -16,6 +16,7 @@ inertia = [[0.04, -0.002, 0.0], [-0.002, 0.045, 0.0], [0.0, 0.0, 0.075]]
 [motor]
 omegaMax = [1000, 1000, 1000, 1000, 1000, 1000]
 tau = 0.035
+[rotor]
 kT = 0.00001
 kQ = 0.00000015
 
@@ -31,7 +32,9 @@ tangentialDamping = 25.0
 frictionCoefficient = 0.6
 
 [models]
-rotor = "speed_driven"
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"
 
 # Shared VirtualIO PWM calibration for both P0 and P1.
 [interface]
