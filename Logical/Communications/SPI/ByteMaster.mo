@@ -9,7 +9,7 @@ block ByteMaster "One outstanding byte request; ideal CPOL/CPHA signal generatio
   input Boolean csActive "Host owns chip select across bytes";
   input Boolean miso "Sampled return line; resolve disabled slave outputs externally";
   output Boolean cs_n;
-  output Boolean sclk(start=false,fixed=true);
+  output Boolean sclk(start=cpol,fixed=true);
   output Boolean mosi;
   output Boolean busy(start=false,fixed=true);
   output Integer completedId(start=0,fixed=true) "Last retired request, including rejected/aborted requests";
@@ -23,6 +23,9 @@ protected
   discrete Integer rxShift(start=0,fixed=true);
   discrete Integer rxCount(start=0,fixed=true);
 initial equation
+  pre(requestId) = 0;
+  pre(csActive) = csActive;
+  pre(miso) = miso;
   assert(clockFrequency > 0,"SPI clockFrequency must be positive");
 equation
   cs_n = not csActive;
@@ -32,9 +35,19 @@ algorithm
     if initial() then
       assert(requestId == 0,"SPI requestId must start at zero; submit after initialization");
       sclk := cpol;
+      busy := false;
+      completedId := 0;
+      rxData := 0;
+      status := 0;
+      nextEdge := Modelica.Constants.inf;
+      activeId := 0;
+      edgeCount := 0;
+      txShift := 0;
+      rxShift := 0;
+      rxCount := 0;
     elseif change(requestId) then
       assert(not pre(busy),"SPI allows one outstanding request; wait for completedId before submitting");
-      assert(requestId > 0 and requestId <> pre(completedId),"SPI requestId must be a new positive identifier");
+      assert(requestId > pre(requestId),"SPI requestId must increase for every request");
       assert(txData >= 0 and txData <= 255,"SPI txData must be an unsigned byte");
       if not csActive then
         completedId := requestId;
@@ -60,8 +73,8 @@ algorithm
       edgeCount := pre(edgeCount)+1;
       sclk := not pre(sclk);
       if (not cpha and mod(edgeCount,2) == 1) or (cpha and mod(edgeCount,2) == 0) then
-        rxShift := if msbFirst then 2*pre(rxShift)+(if miso then 1 else 0)
-          else pre(rxShift)+(if miso then integer(2^pre(rxCount)) else 0);
+        rxShift := if msbFirst then 2*pre(rxShift)+(if pre(miso) then 1 else 0)
+          else pre(rxShift)+(if pre(miso) then integer(2^pre(rxCount)) else 0);
         rxCount := pre(rxCount)+1;
       elseif (not cpha) or edgeCount > 1 then
         txShift := if msbFirst then mod(2*pre(txShift),256) else div(pre(txShift),2);

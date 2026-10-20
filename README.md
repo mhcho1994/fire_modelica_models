@@ -11,7 +11,7 @@ The baseline consists of **continuous P0 motors + R0 rotors + a single 6DOF rigi
 - `Vehicles.Copter.MultirotorWithSensors`: adds an IMU, magnetometer, GNSS, and barometer.
 - `Vehicles.Copter.Presets`: QuadX, HexaX, OctoX, and CoaxialX8. The coaxial preset changes only the layout; aerodynamic interference is not modeled.
 - `Physical.Mechanical.Chassis`: computes mass, CG, and the full inertia tensor from aggregate properties or a static assembly of parts. `LandingGear` reuses the archived point-contact models with FRD mounts and a NED ground normal.
-- `Adapters.VirtualIO`: stateless PWM normalization and sensor-local to FRD/NED value conversion.
+- `Adapters.VirtualIO`: PWM/sensor value conversion and a standalone SPI byte-to-signal adapter.
 - `Exports.FMU`: common external PWM/sensor ports and diagnostic outputs; the composer supplies the selected P0–P4 propulsion composition.
 
 `demand` is a **target rotor-speed ratio, not a thrust ratio**. Motor lag is applied once.
@@ -139,8 +139,10 @@ currently fails compilation; see [validation details](docs/validation.md#p2-elec
 
 ## VirtualIO adapters and FMU export
 
-`Adapters.VirtualIO` contains only `PwmInput` and `SensorValues`. These models convert
-values and do not instantiate a vehicle. P0/P1/P2 compositions extend
+`Adapters.VirtualIO.PwmInput` and `SensorValues` convert values without state or
+vehicle assembly. The standalone `SpiTransfer` adapter adds ideal eight-bit SPI
+signals with a draft boardrunner interface; see [SPI interface](docs/spi_interface.md).
+It is separate from the copter exports. P0/P1/P2 compositions extend
 `Exports.FMU.CopterInterface`, whose `PartialCopterInterface` defines sensor ports,
 unit/geodetic conversions and separate `truth`/`rotorSpeed` diagnostics.
 

@@ -245,3 +245,11 @@ top-level `Controllers` package is reserved for higher-level control laws.
 P3/P4 here are known-position six-step variants; FOC remains future work.
 The equations, ownership and configuration contract are documented in
 [propulsion_modeling.md](propulsion_modeling.md).
+
+## Standalone SPI signal interface
+
+`Adapters.VirtualIO.SpiTransfer` exposes an eight-bit request/completion boundary.
+`Logical.Communications.SPI.ByteMaster` and `ByteSlave` own the discrete clock and
+shift-register behavior. The copter PWM/sensor export remains separate. Host time
+coordination and the boardrunner bridge are proposed, not implemented; see
+[the SPI interface contract](spi_interface.md).

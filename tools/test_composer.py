@@ -198,7 +198,7 @@ class RustComposerTests(unittest.TestCase):
                     adapters = output / 'sources/fire_modelica_models/Adapters'
                     self.assertTrue((adapters / 'VirtualIO/package.mo').is_file())
                     self.assertEqual({p.stem for p in (adapters / 'VirtualIO').glob('*.mo')},
-                                     {'package', 'PwmInput', 'SensorValues'})
+                                     {'package', 'PwmInput', 'SensorValues', 'SpiTransfer'})
                     exports = output / 'sources/fire_modelica_models/Exports/FMU'
                     self.assertTrue((exports / 'CopterInterface.mo').is_file())
                     self.assertNotIn('ambientPressure', (exports / 'PartialCopterInterface.mo').read_text())

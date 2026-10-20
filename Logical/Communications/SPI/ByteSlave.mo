@@ -16,12 +16,21 @@ protected
   discrete Integer txCount(start=0,fixed=true);
   discrete Integer rxShift(start=0,fixed=true);
   discrete Integer rxCount(start=0,fixed=true);
+initial equation
+  pre(cs_n) = cs_n;
+  pre(sclk) = sclk;
+  pre(mosi) = mosi;
 equation
   misoEnabled = not cs_n;
   miso = misoEnabled and (if msbFirst then div(txShift,128) <> 0 else mod(txShift,2) <> 0);
 algorithm
   when {initial(),change(cs_n),change(sclk)} then
     if initial() or change(cs_n) then
+      if initial() then
+        rxData := 0;
+        receivedCount := 0;
+      end if;
+      txShift := 0;
       rxShift := 0;
       rxCount := 0;
       txCount := 0;
@@ -31,8 +40,8 @@ algorithm
       end if;
     elseif not cs_n then
       if (not cpha and sclk <> cpol) or (cpha and sclk == cpol) then
-        rxShift := if msbFirst then 2*pre(rxShift)+(if mosi then 1 else 0)
-          else pre(rxShift)+(if mosi then integer(2^pre(rxCount)) else 0);
+        rxShift := if msbFirst then 2*pre(rxShift)+(if pre(mosi) then 1 else 0)
+          else pre(rxShift)+(if pre(mosi) then integer(2^pre(rxCount)) else 0);
         if pre(rxCount) == 7 then
           rxData := rxShift;
           receivedCount := pre(receivedCount)+1;

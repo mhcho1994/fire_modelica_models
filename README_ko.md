@@ -9,7 +9,7 @@ world NED / chassis·body FRD가 기본입니다.
 - `Vehicles.Copter.MultirotorWithSensors`: IMU, magnetometer, GNSS, barometer를 추가합니다.
 - `Vehicles.Copter.Presets`: QuadX, HexaX, OctoX, CoaxialX8. Coaxial은 배치만 다르며 간섭 공력은 없습니다.
 - `Physical.Mechanical.Chassis`: aggregate 또는 정적 부품 합성으로 질량·CG·full inertia를 계산합니다.
-- `Adapters.VirtualIO`: 상태 없는 PWM 정규화 및 sensor-local→FRD/NED 값 변환입니다.
+- `Adapters.VirtualIO`: PWM·센서 값 변환과 독립적인 SPI 바이트→신호 adapter입니다.
 - `Exports.FMU`: 외부 PWM·센서 포트와 진단 출력을 정의하며 P0/P1/P2 plant는 composer가 조립합니다.
 
 `demand`는 **추력 비율이 아닌 목표 회전속도 비율**입니다. 모터 lag는 한 번만 적용됩니다.
@@ -112,8 +112,10 @@ P2는 OpenModelica native 및 FMI2에서 검증했습니다. Rumoca/FastDyn FMI3
 
 ## VirtualIO adapter와 FMU export 계층
 
-`Adapters.VirtualIO`에는 `PwmInput`, `SensorValues`만 둡니다. 두 모델은 값을 변환하며
-차량을 생성하지 않습니다. P0/P1/P2 조합은 `Exports.FMU.CopterInterface`를 상속합니다.
+`Adapters.VirtualIO`의 `PwmInput`, `SensorValues`는 상태 없이 값을 변환하며 차량을 생성하지 않습니다.
+독립적인 `SpiTransfer`는 이상적인 8비트 SPI 신호를 제공하며 copter export와
+분리되어 있습니다. [SPI 인터페이스 초안](docs/spi_interface_ko.md)을 참고하세요.
+P0/P1/P2 조합은 `Exports.FMU.CopterInterface`를 상속합니다.
 `PartialCopterInterface`가 센서 포트·단위/지리 좌표 변환과 별도 `truth`/`rotorSpeed`
 진단 출력을 정의하고, `CopterInterface`가 공통 PWM adapter를 연결합니다.
 

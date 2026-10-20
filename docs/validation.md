@@ -353,3 +353,19 @@ Reports: `build/p34-native/report.json`, `build/p34-validation/report.json`.
 Rust unit tests, clippy with warnings denied, package registration and the document's
 TOML example also pass. P3/P4 FMI export, FMI stepping, FastDyn firmware execution,
 and Rumoca support are not claimed by these results.
+
+## Standalone SPI signal interface (2026-10-14)
+
+The draft [SPI contract](spi_interface.md) adds a standalone eight-bit
+`Adapters.VirtualIO.SpiTransfer` with ideal logical master/slave models.
+OpenModelica 1.26.1 passes `Examples.SpiTransfer`, `Tests.SpiSignals` and
+`Tests.SpiDisruption` without warnings. Checks cover all four modes and both bit
+orders, repeated identical bytes, 0/255 payloads, CS hold/release, inactive-CS
+rejection, mid-byte cancellation/recovery, and a one-bit MOSI disturbance.
+The example completes requests at 10 and 22 microseconds, eight microseconds
+after submission at 1 MHz. Results: `build/spi-native/report.json`.
+
+The composer suite passes 20 tests, with its 9 native integration tests skipped.
+Its source-bundle expectation includes the new adapter. No SPI copter profile,
+boardrunner bridge, physical EMI model or Rumoca/FMI runtime integration is
+claimed by these checks.
