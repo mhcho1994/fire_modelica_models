@@ -5,6 +5,7 @@ model_name = "ConfiguredQuadP2"
 preset = "QuadX"
 nActuators = 4
 actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1] # Match the ArduCopter Quad-X yaw mixer.
 [models]
 esc = "average_unidirectional"
 motor = "dynamic_dc_equivalent"
